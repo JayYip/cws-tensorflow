@@ -89,3 +89,10 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+#model and data folder
+save_model/
+data/output_dir
+
+#notebook
+*.ipynb
