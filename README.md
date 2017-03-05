@@ -1,3 +1,3 @@
 # Chinese Word Segmentation Using Tensorflow
 
-Nothing else.
+Some code references [TensorFlow Model Zoo](https://github.com/tensorflow/models)

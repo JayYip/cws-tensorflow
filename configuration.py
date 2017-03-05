@@ -16,7 +16,7 @@ class ModelConfig(object):
         
         #Set the feature name of context and tags
         self.context_feature_name = 'text/content_id'
-        self.tag_feature_name = 'text/text_id'
+        self.tag_feature_name = 'text/tag_id'
 
         #Number of thread for prefetching SequenceExample
         self.num_input_reader_thread = 2
@@ -42,7 +42,7 @@ class TrainingConfig(object):
         self.num_examples_per_epoch = 100000
 
         #Optimizer for training
-        self.optimizer = 'AdaGrad'
+        self.optimizer = 'Adam'
 
         #Learning rate
         self.initial_learning_rate = 2.0

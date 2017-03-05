@@ -25,8 +25,8 @@ Files Description:
 
 #TODO/BUG FIX:
 1, Unify tradictional chn and simplified chn. Optional.
-2, Imbalanced.
-
+2, Fix imbalanced threading
+3, Handle non Chinese chr.
 """
 
 from __future__ import absolute_import
@@ -244,7 +244,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
         #shard = thread_index * num_shards_per_batch + s
         #Create file names for shards
         output_filename = "%s-%s" % (name, filename.split('\\')[-1].split('.')[0])
-        output_file = os.path.join(FLAGS.output_dir, output_filename)
+        output_file = os.path.join(FLAGS.output_dir, output_filename + '.TFRecord')
 
         #Init writer
         writer = tf.python_io.TFRecordWriter(output_file)

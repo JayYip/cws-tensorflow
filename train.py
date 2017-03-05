@@ -13,6 +13,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 import configuration
+from lstm_based_cws_model import LSTMCWS
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -36,6 +37,7 @@ def main(unused_argv):
     #Load configuration
     model_config = configuration.ModelConfig()
     train_config = configuration.TrainingConfig()
+    model_config.train_dir = FLAGS.train_dir
 
     #Create train dir
     train_dir = FLAGS.train_dir
@@ -46,3 +48,19 @@ def main(unused_argv):
     #Build graph
     g = tf.Graph()
     with g.as_default():
+        #Build model
+        model = LSTMCWS(ModelConfig, 'train')
+
+        #Set up learning rate and learning rate decay function
+
+        #Set up training op
+
+
+        #Set up saver
+
+
+    #Set up trainer with TFLearn
+
+
+if __name__ == '__main__':
+    tf.app.run()
