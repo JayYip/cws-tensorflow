@@ -81,16 +81,16 @@ class Vocabulary(object):
 
 def tag_to_id(t):
     if t == 's':
-        return 0
-
-    elif t == 'b':
         return 1
 
-    elif t == 'm':
+    elif t == 'b':
         return 2
 
-    elif t == 'e':
+    elif t == 'm':
         return 3
+
+    elif t == 'e':
+        return 4
 
 def split_list(alist, wanted_parts=1):
     length = len(alist)

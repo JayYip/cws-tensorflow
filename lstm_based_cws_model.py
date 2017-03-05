@@ -82,7 +82,7 @@ class LSTMCWS(object):
             pass
 
         #Create example queue
-        example_queue = example_queue_shuffle(reader, filename_queue, 
+        example_queue = input_ops.example_queue_shuffle(reader, filename_queue, 
             self.is_training(), capacity = 50000, num_reader_threads = 1)
 
         #Parse simple example
@@ -90,8 +90,12 @@ class LSTMCWS(object):
             self.config.context_feature_name, self.config.tag_feature_name)
 
         #Use shuffle batch to create shuffle queue and get batch examples
-        input_seqs, tag_seqs, input_mask = input_ops.batch_with_dynamic_pad(input_seq_queue, 
-            tag_seq_queue, self.config.batch_size)
+        input_seqs, tag_seqs, input_mask = tf.train.batch(
+            [input_seq_queue, tag_seq_queue], 
+            batch_size=self.config.batch_size,
+            capacity=queue_capacity,
+            dynamic_pad=True,
+            name="batch_and_pad")
         
         self.input_seqs = input_seqs
         self.tag_seqs = tag_seqs
@@ -105,3 +109,7 @@ class LSTMCWS(object):
             
         """
 
+    def build():
+        """Create all ops for model"""
+        self.build_inputs()
+        self.build_chr_embedding()
