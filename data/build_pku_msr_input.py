@@ -262,7 +262,8 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
             for l in f:
                 pos_tag = []
                 final_line = []
-                decoded_line = l.decode('utf8').split('\u3000')
+                decoded_line = l.decode('utf8').split(' ')
+                decoded_line = [w.strip('\r\n') for w in decoded_line]
 
                 for w in decoded_line:
                     if len(w) <= 29:

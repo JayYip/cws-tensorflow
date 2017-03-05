@@ -24,7 +24,7 @@ def parse_example_queue(example_queue, context_feature_name, tag_feature_name):
 
   Returns:
     input_seq: An int32 Tensor with different length.
-    tag_seq: An int32 Tensor with the shape of [4].
+    tag_seq: An int32 Tensor with different length.
   """
   #Read TFRecord from filename queue
   #_, serialized_example = reader.read(filename_queue)
