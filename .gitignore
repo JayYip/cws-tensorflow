@@ -99,3 +99,6 @@ data/output_dir
 
 #pickle
 *.pkl
+
+#ini file
+*.ini
