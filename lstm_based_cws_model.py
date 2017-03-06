@@ -51,6 +51,9 @@ class LSTMCWS(object):
         #Set up global step tensor
         self.global_step = None
 
+        #Set up embedding table
+        self.embedding_placeholder = tf.placeholder(tf.float32, [self.config.vocab_size, self.config.embedding_size])
+
     def is_training(self):
         return self.mode == 'train'
 
@@ -58,7 +61,7 @@ class LSTMCWS(object):
         """
         Input prefetching, preprocessing and batching
 
-        Outputs:
+        Returns:
             self.input_seqs
             self.tag_seqs
         """
@@ -83,15 +86,16 @@ class LSTMCWS(object):
 
         #Create example queue
         example_queue = input_ops.example_queue_shuffle(reader, filename_queue, 
-            self.is_training(), capacity = 50000, num_reader_threads = 1)
+            self.is_training(), capacity = 50000, num_reader_threads = self.config.num_preprocess_thread)
 
-        #Parse simple example
+        #Parse one example
         input_seq_queue, tag_seq_queue = input_ops.parse_example_queue(example_queue, 
             self.config.context_feature_name, self.config.tag_feature_name)
 
         #Use shuffle batch to create shuffle queue and get batch examples
-        input_seqs, tag_seqs, input_mask = tf.train.batch(
+        input_seqs, tag_seqs = tf.train.batch(
             [input_seq_queue, tag_seq_queue], 
+            num_threads = self.config.num_preprocess_thread,
             batch_size=self.config.batch_size,
             capacity=queue_capacity,
             dynamic_pad=True,
@@ -99,17 +103,96 @@ class LSTMCWS(object):
         
         self.input_seqs = input_seqs
         self.tag_seqs = tag_seqs
-        self.input_mask = input_mask
 
     def build_chr_embedding(self):
         """
         Build Chinese character embedding
 
-        Output:
-            
+        Returns:
+            self.seq_embedding: A tensor with the shape of [batch_size, padding_size, embedding_size]
+            self.tag_embedding: A tensor with the shape of [batch_size, padding_size, num_tag]
         """
+        with tf.variable_scope('seq_embedding') as seq_embedding_scope:
+            chr_embedding = tf.Variable(tf.constant(0.0, shape=[self.config.vocab_size, self.config.embedding_size]),
+                trainable=False, name="chr_embedding")
+
+            chr_assign_op = chr_embedding.assign(self.embedding_placeholder)
+            seq_embedding = tf.nn.embedding_lookup(chr_embedding, self.input_seqs)
+
+            tag_embedding = tf.one_hot(self.tag_seqs, self.config.num_tag)
+
+
+        self.seq_embedding = seq_embedding
+        self.tag_embedding = tag_embedding
+
+    def build_lstm_model():
+        """
+        Build model.
+
+        Returns:
+            PENDING
+        """
+
+        #Setup LSTM Cell
+        lstm_cell = tf.contrib.rnn.BasicLSTMCell(
+            num_units = self.config.num_lstm_units, state_is_tuple = True)
+
+        #Dropout when training
+        if self.is_training():
+            lstm_cell = tf.contrib.rnn.DropoutWrapper(
+                lstm_cell,
+                input_keep_prob = self.config.lstm_dropout_keep_prob,
+                output_keep_prob = self.config.lstm_dropout_keep_prob)
+
+        with tf.variable_scope('lstm') as lstm_scope:
+            #Init lstm
+            #Get the initial state for dynamic_rnn
+            init_state = lstm_cell.zero_state(batch_size = self.config.batch_size, dtype = tf.float32)
+
+            #Allow variable reuse
+            lstm_scope.reuse_variable()
+
+            if self.mode != 'inference':
+
+                #Run LSTM with sequence_length timesteps
+                sequence_length = tf.reduce_sum(self.input_seqs, 1)
+                lstm_output, _ = tf.nn.dynamic_rnn(cell = lstm_cell,
+                    inputs = self.input_seqs,
+                    sequence_length = sequence_length,
+                    initial_state = init_state,
+                    dtype = tf.float32,
+                    scope = lstm_scope)
+
+            else:
+
+                #TODO
+                #Reference.
+
+        # Stack batches vertically.
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, lstm_cell.output_size])
+
+        #Final fully connected layer to create output
+        with tf.variable_scope('logit') as logit_scope:
+            logit = tf.contrib.fully_connected(input = self.lstm_output,
+                num_outputs = self.config.num_tag,
+                activation_fn = None,
+                weight_initializer = self.initializer,
+                score = logit_scope)
+
+        self.logit = logit
+
+    def build_tag_inference():
+        """
+        Create tag inference for sentence score.
+
+        """
+
+
+
 
     def build():
         """Create all ops for model"""
         self.build_inputs()
         self.build_chr_embedding()
+        self.build_lstm_model()
+        self.build_tag_inference()

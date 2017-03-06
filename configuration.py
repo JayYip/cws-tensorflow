@@ -19,7 +19,7 @@ class ModelConfig(object):
         self.tag_feature_name = 'text/tag_id'
 
         #Number of thread for prefetching SequenceExample
-        self.num_input_reader_thread = 2
+        #self.num_input_reader_thread = 2
         #Number of preprocessing threads
         self.num_preprocess_thread = 2
 
@@ -27,8 +27,11 @@ class ModelConfig(object):
         self.batch_size = 512
 
         #LSTM input and output dimensions
-        self.embedding_size = 300
-        self.num_lstm_units = 300
+        self.embedding_size = 64
+        self.num_lstm_units = 4
+
+        #Fully connected layer output dimensions
+        self.num_tag = 4
 
         #Dropout
         self.lstm_dropout_keep_prob = 0.7

@@ -42,6 +42,7 @@ import numpy as np
 import threading
 from datetime import datetime
 import sys
+import pickle
 
 import tensorflow as tf
 
@@ -348,7 +349,8 @@ def main(unused_argv):
 
     path_list = download_extract(FLAGS.data_source, 'N')
     vocab = _create_vocab(path_list)
-    _process_dataset('train', path_list, vocab)
+    pickle.dump(vocab, open('vocab.pkl', 'wb'))
+    #_process_dataset('train', path_list, vocab)
 
 
 if __name__ == '__main__':

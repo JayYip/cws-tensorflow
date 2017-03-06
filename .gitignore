@@ -96,3 +96,6 @@ data/output_dir
 
 #notebook
 *.ipynb
+
+#pickle
+*.pkl
