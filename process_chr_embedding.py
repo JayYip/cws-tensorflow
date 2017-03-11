@@ -17,7 +17,10 @@ import numpy as np
 import tensorflow as tf
 import configuration
 
+FLAGS = tf.app.flags.FLAGS
 
+tf.flags.DEFINE_string("chr_embedding_dir", 'polyglot-zh_char.pkl',
+                       "Path to polyglot embedding file")
 
 
 
@@ -54,16 +57,17 @@ class Vocabulary(object):
 def download_embedding():
     """
     Download files from web
+    Seems cannot download by pgm
+    Download from: https://sites.google.com/site/rmyeid/projects/polyglot
 
     Returns:
         A tuple (word, embedding). Emebddings shape is (100004, 64).
     """
-    if not tf.gfile.Exists('polyglot-zh_char.pkl'):
 
-        urllib.request.urlretrieve('http://sighan.cs.uchicago.edu/bakeoff2005/data/icwb2-data.zip', 
-            'polyglot-zh_char.pkl')
+    assert (tf.gfile.Exists(FLAGS.chr_embedding_dir)), ("Embedding pkl don't found, please \
+        download the Chinese chr embedding from https://sites.google.com/site/rmyeid/projects/polyglot")
 
-    with open('polyglot-zh_char.pkl', 'rb') as f:
+    with open(FLAGS.chr_embedding_dir, 'rb') as f:
         u = pickle._Unpickler(f)
         u.encoding = 'latin1'
         p = u.load()
@@ -112,6 +116,7 @@ def main(unused_argv):
     original_embedding = download_embedding()
 
     chr_embedding = process_embedding(vocab, original_embedding, model_config)
+    print(chr_embedding[0,:])
 
     pickle.dump(chr_embedding, open('chr_embedding.pkl', 'wb'))
 

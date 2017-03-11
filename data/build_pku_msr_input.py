@@ -90,16 +90,16 @@ class Vocabulary(object):
 
 def tag_to_id(t):
     if t == 's':
-        return 1
+        return 0
 
     elif t == 'b':
-        return 2
+        return 1
 
     elif t == 'm':
-        return 3
+        return 2
 
     elif t == 'e':
-        return 4
+        return 3
 
 def split_list(alist, wanted_parts=1):
     length = len(alist)
@@ -240,7 +240,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
 
 
     #Create possible tags for fast lookup
-    possible_tags = ['0']
+    possible_tags = []
     for i in range(1, 30):
         if i == 1:
             possible_tags.append('s')
@@ -277,7 +277,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
                 for w in decoded_line:
                     if len(w) <= 29:
                         final_line.append(w)
-                        pos_tag.append(possible_tags[len(w)])
+                        pos_tag.append(possible_tags[len(w)-1])
 
                 decode_str = ''.join(final_line)
 
@@ -285,11 +285,12 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
 
                 if len(pos_tag_str) != len(decode_str):
                     continue
-                    print('Skip one row. ' + pos_tag_str + ';' + decoded_str)
+                    print('Skip one row. ' + pos_tag_str + ';' + decode_str)
 
-                sequence_example = _to_sequence_example(decode_str, pos_tag_str, vocab)
-                writer.write(sequence_example.SerializeToString())
-                counter += 1
+                if len(decode_str) > 0: 
+                    sequence_example = _to_sequence_example(decode_str, pos_tag_str, vocab)
+                    writer.write(sequence_example.SerializeToString())
+                    counter += 1
 
                 if not counter % 5000:
                     print("%s [thread %d]: Processed %d in thread batch." %
@@ -342,7 +343,7 @@ def _process_dataset(name, path_list, vocab):
 
     # Wait for all the threads to terminate.
     coord.join(threads)
-    print("%s: Finished processing all %d image-caption pairs in data set '%s'." %
+    print("%s: Finished processing all %d text files in data set '%s'." %
         (datetime.now(), len(path_list), name))
 
 
@@ -358,7 +359,7 @@ def main(unused_argv):
     path_list = download_extract(FLAGS.data_source, 'N')
     vocab = _create_vocab(path_list)
     pickle.dump(vocab, open('vocab.pkl', 'wb'))
-    #_process_dataset('train', path_list, vocab)
+    _process_dataset('train', path_list, vocab)
 
 
 if __name__ == '__main__':

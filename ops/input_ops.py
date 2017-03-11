@@ -87,6 +87,3 @@ def example_queue_shuffle(reader, filename_queue, is_training, example_queue_nam
       tf.cast(example_queue.size(), tf.float32) * (1. / capacity))
 
   return example_queue
-
-
-

@@ -15,6 +15,9 @@ import tensorflow as tf
 import configuration
 from lstm_based_cws_model import LSTMCWS
 
+import pickle
+
+
 FLAGS = tf.app.flags.FLAGS
 
 tf.flags.DEFINE_string("input_file_dir", "data\output_dir",
@@ -24,6 +27,8 @@ tf.flags.DEFINE_string("train_dir", "save_model",
 tf.flags.DEFINE_integer("number_of_steps", 1000000, "Number of training steps.")
 tf.flags.DEFINE_integer("log_every_n_steps", 10,
                         "Frequency at which loss and global step are logged.")
+tf.flags.DEFINE_string("tag_inf_ckpt", "tag_inf.ckpt",
+                        "If the tag inference model checkpoint cannot be found, tag inference will be trained.")
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -44,6 +49,9 @@ def main(unused_argv):
     if not tf.gfile.IsDirectory(train_dir):
         tf.logging.info('Create Training dir as %s', train_dir)
         tf.gfile.MakeDirs(train_dir)
+
+    #Load chr emdedding table
+    chr_embedding = pickle.load(open('chr_embedding.pkl', 'wb'))
 
     #Build graph
     g = tf.Graph()

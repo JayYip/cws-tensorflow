@@ -28,13 +28,18 @@ class ModelConfig(object):
 
         #LSTM input and output dimensions
         self.embedding_size = 64
-        self.num_lstm_units = 4
+        self.num_lstm_units = 64
 
         #Fully connected layer output dimensions
         self.num_tag = 4
 
         #Dropout
         self.lstm_dropout_keep_prob = 0.7
+        #Margin loss discount
+        self.margin_loss_discount = 0.2
+        #Regularization
+        self.regularization = 0.0001
+        
 
         self.layer_norm = True
 
