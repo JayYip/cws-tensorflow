@@ -116,7 +116,6 @@ def main(unused_argv):
     original_embedding = download_embedding()
 
     chr_embedding = process_embedding(vocab, original_embedding, model_config)
-    print(chr_embedding[0,:])
 
     pickle.dump(chr_embedding, open('chr_embedding.pkl', 'wb'))
 

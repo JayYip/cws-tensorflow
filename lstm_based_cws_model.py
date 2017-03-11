@@ -52,7 +52,7 @@ class LSTMCWS(object):
         self.global_step = None
 
         #Set up embedding table
-        self.embedding_placeholder = tf.placeholder(tf.float32, [self.config.vocab_size, self.config.embedding_size])
+        self.embedding_tensor = None
 
     def is_training(self):
         return self.mode == 'train'
@@ -88,7 +88,7 @@ class LSTMCWS(object):
             pass
 
         #Create example queue
-        example_queue = input_ops.example_queue_shuffle(reader, filename_queue, 
+        example_queue = input_ops.example_queue_shuffle(self.reader, filename_queue, 
             self.is_training(), capacity = 50000, num_reader_threads = self.config.num_preprocess_thread)
 
         #Parse one example
@@ -97,25 +97,31 @@ class LSTMCWS(object):
 
         #Right shift the tag seq as target seq
         seq_length = tf.expand_dims(tf.subtract(tf.shape(tag_seq_queue)[0], 1),0)
-
-        # The input seq is from 0 to t-1
-        # The output seq is from 1 to t
         indicator = tf.ones(seq_length, dtype=tf.int32)
-        tag_input_seq_queue = tf.slice(tag_seq_queue, [0], seq_length)
-        tag_output_seq_queue = tf.slice(tag_seq_queue, [1], seq_length)
+        #tag_input_seq_queue = tf.slice(tag_seq_queue, [0], seq_length)
+        #tag_output_seq_queue = tf.slice(tag_seq_queue, [1], seq_length)
 
         #Use shuffle batch to create shuffle queue and get batch examples
-        input_seqs, tag_seqs, tag_input_seq, tag_output_seq, input_mask = tf.train.batch(
-            [input_seq_queue, tag_seq_queue, tag_input_seq_queue, tag_output_seq_queue, indicator], 
-            batch_size=config.batch_size,
+        #input_seqs, tag_seqs, tag_input_seq, tag_output_seq, input_mask = tf.train.batch(
+        #    [input_seq_queue, tag_seq_queue, tag_input_seq_queue, tag_output_seq_queue, indicator], 
+        #    batch_size=self.config.batch_size,
+        #    capacity=50000,
+        #    dynamic_pad=True,
+        #    name="batch_and_pad")
+
+        input_seqs, tag_seqs, input_mask = tf.train.batch(
+            [input_seq_queue, tag_seq_queue, indicator], 
+            batch_size=self.config.batch_size,
             capacity=50000,
             dynamic_pad=True,
             name="batch_and_pad")
         
         self.input_seqs = input_seqs
         self.tag_seqs = tag_seqs
-        self.tag_input_seq = tag_input_seq
-        self.tag_output_seq = tag_output_seq
+        #self.tag_input_seq = tag_input_seq
+        #self.tag_output_seq = tag_output_seq
+        self.input_mask = input_mask
+
 
     def build_chr_embedding(self):
         """
@@ -125,22 +131,20 @@ class LSTMCWS(object):
             self.seq_embedding: A tensor with the shape of [batch_size, padding_size, embedding_size]
             self.tag_embedding: A tensor with the shape of [batch_size, padding_size, num_tag]
         """
-        with tf.variable_scope('seq_embedding') as seq_embedding_scope:
-            chr_embedding = tf.Variable(tf.constant(0.0, shape=[self.config.embedding_size, self.config.embedding_size]),
-                validate_shape=False, trainable=False, name="chr_embedding")
+        with tf.variable_scope('seq_embedding', reuse = True) as seq_embedding_scope:
+            chr_embedding = tf.Variable(self.embedding_tensor, name="chr_embedding")
 
-            chr_assign_op = chr_embedding.assign(self.embedding_placeholder)
             seq_embedding = tf.nn.embedding_lookup(chr_embedding, self.input_seqs)
-
             tag_embedding = tf.one_hot(self.tag_seqs, self.config.num_tag)
-            tag_input_embedding = tf.one_hot(self.tag_input_seq, self.config.num_tag)
-            tag_output_embedding = tf.one_hot(self.tag_output_seq, self.config.num_tag)
+            #tag_input_embedding = tf.one_hot(self.tag_input_seq, self.config.num_tag)
+            #tag_output_embedding = tf.one_hot(self.tag_output_seq, self.config.num_tag)
 
 
         self.seq_embedding = seq_embedding
         self.tag_embedding = tag_embedding
-        self.tag_input_embedding = tag_input_embedding
-        self.tag_output_embedding = tag_output_embedding
+        #self.tag_input_embedding = tag_input_embedding
+        #self.tag_output_embedding = tag_output_embedding
+
 
 
     def build_lstm_model(self):
@@ -162,7 +166,7 @@ class LSTMCWS(object):
                 input_keep_prob = self.config.lstm_dropout_keep_prob,
                 output_keep_prob = self.config.lstm_dropout_keep_prob)
 
-        self.seq_embedding.set_shape([None, None, config.embedding_size])
+        self.seq_embedding.set_shape([None, None, self.config.embedding_size])
 
         with tf.variable_scope('seq_lstm') as lstm_scope:
             #Init lstm
@@ -172,7 +176,7 @@ class LSTMCWS(object):
             if self.mode != 'inference':
 
                 #Run LSTM with sequence_length timesteps
-                sequence_length = tf.add(tf.reduce_sum(input_mask, 1), 1)
+                sequence_length = tf.add(tf.reduce_sum(self.input_mask, 1), 1)
                 lstm_output, _ = tf.nn.dynamic_rnn(cell = lstm_cell,
                     inputs = self.seq_embedding,
                     sequence_length = sequence_length,
@@ -181,13 +185,12 @@ class LSTMCWS(object):
                     scope = lstm_scope)
 
             else:
-
+                pass
                 #TODO
                 #Reference.
 
         # Stack batches vertically.
         #lstm_output = tf.reshape(lstm_output, [-1, lstm_cell.output_size])
-
 
         self.lstm_output = lstm_output
 
@@ -200,7 +203,7 @@ class LSTMCWS(object):
             logit = tf.contrib.layers.fully_connected(inputs = self.lstm_output,
                 num_outputs = self.config.num_tag,
                 activation_fn = None,
-                weights_initializer = initializer,
+                weights_initializer = self.initializer,
                 scope = logit_scope)
 
         if self.mode == 'inference':
@@ -209,17 +212,12 @@ class LSTMCWS(object):
         else:
             with tf.variable_scope('tag_inf') as tag_scope:
 
-                sequence_length = tf.reduce_sum(input_mask, 1)
+                sequence_length = tf.reduce_sum(self.input_mask, 1)
                 sentence_likelihood, transition_param = tf.contrib.crf.crf_log_likelihood(inputs = logit,
                     tag_indices = tf.to_int32(self.tag_seqs),
                     sequence_lengths = sequence_length)
 
-            #Create weights: 0 weight for padding
-            weights = tf.to_float(tf.reshape(self.input_mask, [-1]))
-
-            batch_loss = tf.div(tf.reduce_sum(tf.multiply(-sentence_likelihood, weights)),
-                              tf.reduce_sum(weights),
-                              name="batch_loss")
+            batch_loss = tf.reduce_sum(-sentence_likelihood)
 
             #Add to total loss
             tf.losses.add_loss(batch_loss)
@@ -230,11 +228,24 @@ class LSTMCWS(object):
             tf.summary.scalar('losses/batch_loss', batch_loss)
             tf.summary.scalar('losses/total_loss', total_loss)
 
+            self.batch_loss = batch_loss
+            self.total_loss = total_loss
 
 
-    def build():
+    def setup_global_step(self):
+        """Sets up the global step Tensor."""
+        global_step = tf.Variable(
+            initial_value=0,
+            name="global_step",
+            trainable=False,
+            collections=[tf.GraphKeys.GLOBAL_STEP, tf.GraphKeys.GLOBAL_VARIABLES])
+
+        self.global_step = global_step
+
+    def build(self):
         """Create all ops for model"""
         self.build_inputs()
         self.build_chr_embedding()
         self.build_lstm_model()
         self.build_sentence_score_loss()
+        self.setup_global_step()

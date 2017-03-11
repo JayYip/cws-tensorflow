@@ -47,14 +47,15 @@ class TrainingConfig(object):
     """docstring for TrainingConfig"""
     def __init__(self):
         
-        self.num_examples_per_epoch = 100000
+        self.num_examples_per_epoch = 5120
 
         #Optimizer for training
         self.optimizer = 'Adam'
 
         #Learning rate
         self.initial_learning_rate = 2.0
-        self.learning_rate_dacay_factor = 0.5
+        #If decay factor <= 0 then not decay
+        self.learning_rate_decay_factor = 0.5
         self.num_epochs_per_decay = 5.0
 
         #Gradient clipping
@@ -62,4 +63,7 @@ class TrainingConfig(object):
 
         #Max checkpoints to keep
         self.max_checkpoints_to_keep = 5
+
+        #Set training step
+        self.training_step = 10000
 
