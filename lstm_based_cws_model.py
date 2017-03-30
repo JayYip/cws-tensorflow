@@ -3,8 +3,6 @@
 #Author: Jay Yip
 #Date 04Mar2017
 
-#TODO:
-#1, Inference and Evaluation in build_input
 
 """Chinese words segmentation model based on aclweb.org/anthology/D15-1141"""
 
@@ -59,7 +57,9 @@ class LSTMCWS(object):
 
     def build_inputs(self):
         """
-        Input prefetching, preprocessing and batching
+        Input prefetching, preprocessing and batching for trianing
+
+        For inference mode, input seqs and input mask needs to be provided.
 
         Returns:
             self.input_seqs: A tensor of Input sequence to seq_lstm with the shape of [batch_size, padding_size]
@@ -83,43 +83,36 @@ class LSTMCWS(object):
             filename_queue = tf.train.string_input_producer(
                 data_files, shuffle = True, capacity = 16, name = 'filename_input_queue')
 
+            #Create example queue
+            example_queue = input_ops.example_queue_shuffle(self.reader, filename_queue, 
+                self.is_training(), capacity = 50000, num_reader_threads = self.config.num_preprocess_thread)
+
+            #Parse one example
+            input_seq_queue, tag_seq_queue = input_ops.parse_example_queue(example_queue, 
+                self.config.context_feature_name, self.config.tag_feature_name)
+
+            
+            seq_length = tf.expand_dims(tf.subtract(tf.shape(tag_seq_queue)[0], 1),0)
+            indicator = tf.ones(seq_length, dtype=tf.int32)
+
+            input_seqs, tag_seqs, input_mask = tf.train.batch(
+                [input_seq_queue, tag_seq_queue, indicator], 
+                batch_size=self.config.batch_size,
+                capacity=50000,
+                dynamic_pad=True,
+                name="batch_and_pad")
+
         else:
-            #TODO
-            pass
+            #Inference
+            input_seq_feed = tf.get_default_graph().get_tensor_by_name("input_seq_feed:0")
+            input_seqs = tf.expand_dims(input_seq_feed, 0)
+            input_mask = tf.ones(tf.shape(input_seqs), dtype=tf.int32)
 
-        #Create example queue
-        example_queue = input_ops.example_queue_shuffle(self.reader, filename_queue, 
-            self.is_training(), capacity = 50000, num_reader_threads = self.config.num_preprocess_thread)
+            tag_seqs = None
 
-        #Parse one example
-        input_seq_queue, tag_seq_queue = input_ops.parse_example_queue(example_queue, 
-            self.config.context_feature_name, self.config.tag_feature_name)
-
-        #Right shift the tag seq as target seq
-        seq_length = tf.expand_dims(tf.subtract(tf.shape(tag_seq_queue)[0], 1),0)
-        indicator = tf.ones(seq_length, dtype=tf.int32)
-        #tag_input_seq_queue = tf.slice(tag_seq_queue, [0], seq_length)
-        #tag_output_seq_queue = tf.slice(tag_seq_queue, [1], seq_length)
-
-        #Use shuffle batch to create shuffle queue and get batch examples
-        #input_seqs, tag_seqs, tag_input_seq, tag_output_seq, input_mask = tf.train.batch(
-        #    [input_seq_queue, tag_seq_queue, tag_input_seq_queue, tag_output_seq_queue, indicator], 
-        #    batch_size=self.config.batch_size,
-        #    capacity=50000,
-        #    dynamic_pad=True,
-        #    name="batch_and_pad")
-
-        input_seqs, tag_seqs, input_mask = tf.train.batch(
-            [input_seq_queue, tag_seq_queue, indicator], 
-            batch_size=self.config.batch_size,
-            capacity=50000,
-            dynamic_pad=True,
-            name="batch_and_pad")
         
         self.input_seqs = input_seqs
         self.tag_seqs = tag_seqs
-        #self.tag_input_seq = tag_input_seq
-        #self.tag_output_seq = tag_output_seq
         self.input_mask = input_mask
 
 
@@ -135,15 +128,14 @@ class LSTMCWS(object):
             chr_embedding = tf.Variable(self.embedding_tensor, name="chr_embedding")
 
             seq_embedding = tf.nn.embedding_lookup(chr_embedding, self.input_seqs)
-            tag_embedding = tf.one_hot(self.tag_seqs, self.config.num_tag)
-            #tag_input_embedding = tf.one_hot(self.tag_input_seq, self.config.num_tag)
-            #tag_output_embedding = tf.one_hot(self.tag_output_seq, self.config.num_tag)
+            if self.is_training():
+                tag_embedding = tf.one_hot(self.tag_seqs, self.config.num_tag)
+            else:
+                tag_embedding = None
 
 
         self.seq_embedding = seq_embedding
         self.tag_embedding = tag_embedding
-        #self.tag_input_embedding = tag_input_embedding
-        #self.tag_output_embedding = tag_output_embedding
 
 
 
@@ -171,26 +163,22 @@ class LSTMCWS(object):
         with tf.variable_scope('seq_lstm') as lstm_scope:
             #Init lstm
             #Get the initial state for dynamic_rnn
-            init_state = lstm_cell.zero_state(batch_size = self.config.batch_size, dtype = tf.float32)
-
-            if self.mode != 'inference':
-
-                #Run LSTM with sequence_length timesteps
-                sequence_length = tf.add(tf.reduce_sum(self.input_mask, 1), 1)
-                lstm_output, _ = tf.nn.dynamic_rnn(cell = lstm_cell,
-                    inputs = self.seq_embedding,
-                    sequence_length = sequence_length,
-                    initial_state = init_state,
-                    dtype = tf.float32,
-                    scope = lstm_scope)
-
+            if self.is_training():
+                init_state = lstm_cell.zero_state(batch_size = self.config.batch_size, dtype = tf.float32)
             else:
-                pass
-                #TODO
-                #Reference.
+                init_state = lstm_cell.zero_state(batch_size = 1, dtype = tf.float32)
+                self.seq_embedding = tf.cast(self.seq_embedding, tf.float32)
 
-        # Stack batches vertically.
-        #lstm_output = tf.reshape(lstm_output, [-1, lstm_cell.output_size])
+
+            #Run LSTM with sequence_length timesteps
+            sequence_length = tf.add(tf.reduce_sum(self.input_mask, 1), 1)
+            lstm_output, _ = tf.nn.dynamic_rnn(cell = lstm_cell,
+                inputs = self.seq_embedding,
+                sequence_length = sequence_length,
+                initial_state = init_state,
+                dtype = tf.float32,
+                scope = lstm_scope)
+
 
         self.lstm_output = lstm_output
 
@@ -206,16 +194,37 @@ class LSTMCWS(object):
                 weights_initializer = self.initializer,
                 scope = logit_scope)
 
-        if self.mode == 'inference':
+        if not self.is_training():
             #Get maximum sentence score
-            pass
+
+            #def _map_sentence_score_fn(ts):
+            #    """Simple wrapper for map_fn"""
+            #    with tf.variable_scope('tag_inf') as tag_scope:
+            #        transition_param = tf.Variable(tf.zeros([self.config.num_tag]), name = 'transitions')
+            #        
+            #    return tf.contrib.crf.viterbi_decode(ts, transition_param)[0]
+
+            #predict_seq = tf.map_fn(_map_sentence_score_fn, logit)
+            #with tf.variable_scope('tag_inf', reuse = True) as scope:
+            #    transition_param = tf.get_variable(name = 'transitions')
+                #transition_param = tf.get_variable(shape = [self.config.num_tag,self.config.num_tag], name = 'transitions:0')
+
+            logit = tf.squeeze(logit)
+
+            self.logit = logit
+
         else:
             with tf.variable_scope('tag_inf') as tag_scope:
-
                 sequence_length = tf.reduce_sum(self.input_mask, 1)
                 sentence_likelihood, transition_param = tf.contrib.crf.crf_log_likelihood(inputs = logit,
                     tag_indices = tf.to_int32(self.tag_seqs),
                     sequence_lengths = sequence_length)
+
+                share_transition_param = tf.get_variable(name = 'transition_param', 
+                    shape = [self.config.num_tag,self.config.num_tag],
+                    initializer = self.initializer)
+                ass_op = share_transition_param.assign(transition_param)
+                print('Assigned transition param')
 
             batch_loss = tf.reduce_sum(-sentence_likelihood)
 

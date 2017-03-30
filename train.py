@@ -31,7 +31,6 @@ tf.logging.set_verbosity(tf.logging.INFO)
 
 def main(unused_argv):
 
-    sess = tf.InteractiveSession()
 
     assert FLAGS.input_file_dir, "--input_file_dir is required"
     assert FLAGS.train_dir, "--train_dir is required"
