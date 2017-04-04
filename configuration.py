@@ -40,7 +40,7 @@ class ModelConfig(object):
         #Regularization
         self.regularization = 0.0001
         
-
+        #TODO
         self.layer_norm = True
 
 class TrainingConfig(object):
@@ -65,7 +65,7 @@ class TrainingConfig(object):
         self.max_checkpoints_to_keep = 5
 
         #Set training step
-        self.training_step = 100
+        self.training_step = 500
 
 class InferenceConfig(object):
 

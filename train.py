@@ -48,12 +48,16 @@ def main(unused_argv):
 
     #Load chr emdedding table
     chr_embedding = pickle.load(open('chr_embedding.pkl', 'rb'))
+    shape = chr_embedding.shape
 
     #Build graph
     g = tf.Graph()
     with g.as_default():
         #Set embedding table
         embedding = tf.convert_to_tensor(chr_embedding, dtype = tf.float32)
+        with tf.variable_scope('seq_embedding') as seq_embedding_scope:
+            chr_embedding_var = tf.get_variable(name = 'chr_embedding', shape = (shape[0], shape[1]))
+            embedding_assign_op = chr_embedding_var.assign(embedding)
 
         #Build model
         model = LSTMCWS(model_config, 'train')

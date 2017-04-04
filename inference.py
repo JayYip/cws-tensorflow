@@ -15,38 +15,10 @@ import pickle
 
 import os
 from ops import input_ops
+from os.vocab import Vocabulary
 import configuration
 from lstm_based_cws_model import LSTMCWS
 
-
-
-class Vocabulary(object):
-  """Simple vocabulary wrapper."""
-
-  def __init__(self, vocab, unk_id, unk_word = '<UNK>'):
-    """Initializes the vocabulary.
-
-    Args:
-      vocab: A dictionary of word to word_id.
-      unk_id: Id of the special 'unknown' word.
-    """
-    self._vocab = vocab
-    self._unk_id = unk_id
-    self._vocab[unk_word] = 0
-
-  def word_to_id(self, word):
-    """Returns the integer id of a word string."""
-    if word in self._vocab:
-      return self._vocab[word]
-    else:
-      return self._unk_id
-
-  def id_to_word(self, word_id):
-    """Returns the word string of an integer word id."""
-    if word_id >= len(self._vocab):
-      return self._vocab[self.unk_id]
-    else:
-      return self._vocab[word_id]
 
 def _create_restore_fn(checkpoint_path, saver):
     """Creates a function that restores a model from checkpoint.
@@ -77,7 +49,24 @@ def _create_restore_fn(checkpoint_path, saver):
 
         return _restore_fn
 
+def insert_space(char, tag):
+    if tag == 0 or tag == 3:
+        return char + ' '
 
+def get_final_output(line, predict_tag):
+    return ''.join([insert_space(char, tag) for char, tag in zip(line, predict_tag)])
+
+def append_to_file(output_buffer, filename):
+    filename = os.path.join('output', 'out' + filename)
+
+    if os.path.exists(filename):
+        append_write = 'a' # append if already exists
+    else:
+        append_write = 'w' # make a new file if not
+
+    with open(filename, append_write) as file:
+        for item in output_buffer:
+            file.write("%s\n" % item)
 
 
 
@@ -103,14 +92,12 @@ def main(unused_argv)
     model_config = configuration.ModelConfig()
     inference_config = configuration.InferenceConfig()
 
-    chr_embedding = pickle.load(open('chr_embedding.pkl', 'rb'))
 
     #Build graph for inference
     g = tf.Graph()
     with g.as_default():
 
         input_seq_feed = tf.placeholder(name = 'input_seq_feed', dtype = tf.int64)
-        embedding = tf.convert_to_tensor(chr_embedding, dtype = tf.float32)
 
         #Add transition var to graph
         with tf.variable_scope('tag_inf') as scope:
@@ -119,7 +106,6 @@ def main(unused_argv)
 
         #Build model
         model = LSTMCWS(model_config, 'inference')
-        model.embedding_tensor = embedding
         print('Building model...')
         model.build()
 
@@ -134,43 +120,21 @@ def main(unused_argv)
 
 
         for filename in filename_list:
-
+            output_buffer = []
             with tf.gfile.GFile(filename) as f:
                 for line in f:
                     input_seqs_list = [p.word_to_id(x) for x in line]
-                    logit, transition_param = sess.run([model.logit, transition_param], 
+                    logit, transition_param_array = sess.run([model.logit, transition_param], 
                         feed_dict = {input_seq_feed:input_seqs_list})
-                    print(tf.contrib.crf.viterbi_decode(logit, transition_param)[0])
-                    break
+                    predict_tag = tf.contrib.crf.viterbi_decode(logit, transition_param_array)[0]
+                    output_buffer.append(get_final_output(line, predict_tag))
 
+                    if len(output_buffer) >= 1000:
+                        append_to_file(output_buffer, filename)
+                        output_buffer = []
 
-            #Make hash table to convert words to id
-            ts_hash_keys = tf.convert_to_tensor(hash_keys)
-            ts_hash_values = tf.convert_to_tensor(hash_values)
-            vocab = tf.contrib.lookup.HashTable(
-                tf.contrib.lookup.KeyValueTensorInitializer(ts_hash_keys, ts_hash_values), -1)
-
-            raw_text = tf.expand_dims(raw_text, 0)
-
-            split_text = tf.string_split(raw_text, delimiter='').values
-
-            #Convert to id
-            input_seq_queue = vocab.lookup(split_text)
-
-            seq_length = tf.expand_dims(tf.subtract(tf.shape(tag_seq_queue)[0], 1),0)
-            indicator = tf.ones(seq_length, dtype=tf.int32)
-
-            input_seqs, input_mask = tf.train.batch(
-                [input_seq_queue, indicator], 
-                batch_size=inference_config.batch_size,
-                capacity=50000,
-                dynamic_pad=True,
-                name="batch_and_pad")
-
-            model.input_seqs = input_seqs
-            model.input_mask = input_mask
-
-
+                if output_buffer:
+                    append_to_file(output_buffer, filename)
 
 
 if __name__ == '__main__':

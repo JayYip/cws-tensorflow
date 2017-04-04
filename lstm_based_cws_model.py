@@ -125,7 +125,8 @@ class LSTMCWS(object):
             self.tag_embedding: A tensor with the shape of [batch_size, padding_size, num_tag]
         """
         with tf.variable_scope('seq_embedding', reuse = True) as seq_embedding_scope:
-            chr_embedding = tf.Variable(self.embedding_tensor, name="chr_embedding")
+            #chr_embedding = tf.Variable(self.embedding_tensor, name="chr_embedding")
+            chr_embedding = tf.get_variable(name="chr_embedding", validate_shape = False)
 
             seq_embedding = tf.nn.embedding_lookup(chr_embedding, self.input_seqs)
             if self.is_training():
@@ -195,20 +196,7 @@ class LSTMCWS(object):
                 scope = logit_scope)
 
         if not self.is_training():
-            #Get maximum sentence score
-
-            #def _map_sentence_score_fn(ts):
-            #    """Simple wrapper for map_fn"""
-            #    with tf.variable_scope('tag_inf') as tag_scope:
-            #        transition_param = tf.Variable(tf.zeros([self.config.num_tag]), name = 'transitions')
-            #        
-            #    return tf.contrib.crf.viterbi_decode(ts, transition_param)[0]
-
-            #predict_seq = tf.map_fn(_map_sentence_score_fn, logit)
-            #with tf.variable_scope('tag_inf', reuse = True) as scope:
-            #    transition_param = tf.get_variable(name = 'transitions')
-                #transition_param = tf.get_variable(shape = [self.config.num_tag,self.config.num_tag], name = 'transitions:0')
-
+            # In inference, logit will be returned since the decode fn only takes numpy array.
             logit = tf.squeeze(logit)
 
             self.logit = logit
@@ -224,7 +212,6 @@ class LSTMCWS(object):
                     shape = [self.config.num_tag,self.config.num_tag],
                     initializer = self.initializer)
                 ass_op = share_transition_param.assign(transition_param)
-                print('Assigned transition param')
 
             batch_loss = tf.reduce_sum(-sentence_likelihood)
 
@@ -237,6 +224,11 @@ class LSTMCWS(object):
             tf.summary.scalar('losses/batch_loss', batch_loss)
             tf.summary.scalar('losses/total_loss', total_loss)
 
+            #For test only
+            self.logit = logit
+            self.sentence_likelihood = sentence_likelihood
+
+            #Output loss
             self.batch_loss = batch_loss
             self.total_loss = total_loss
 
