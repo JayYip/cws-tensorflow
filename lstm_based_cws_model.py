@@ -126,7 +126,10 @@ class LSTMCWS(object):
         """
         with tf.variable_scope('seq_embedding', reuse = True) as seq_embedding_scope:
             #chr_embedding = tf.Variable(self.embedding_tensor, name="chr_embedding")
-            chr_embedding = tf.get_variable(name="chr_embedding", validate_shape = False)
+            if self.is_training():
+                chr_embedding = tf.get_variable(name="chr_embedding", validate_shape = False)
+            else:
+                chr_embedding = tf.Variable(tf.zeros([10]), validate_shape=False, name="chr_embedding")
 
             seq_embedding = tf.nn.embedding_lookup(chr_embedding, self.input_seqs)
             if self.is_training():

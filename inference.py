@@ -15,10 +15,18 @@ import pickle
 
 import os
 from ops import input_ops
-from os.vocab import Vocabulary
+from ops.vocab import Vocabulary
 import configuration
 from lstm_based_cws_model import LSTMCWS
 
+FLAGS = tf.app.flags.FLAGS
+
+tf.flags.DEFINE_string("input_file_dir", "data\\output_dir\\icwb2-data\\testing\\",
+                       "Path of input files.")
+tf.flags.DEFINE_string("train_dir", "save_model",
+                       "Directory for saving and loading model checkpoints.")
+tf.flags.DEFINE_integer("out_dir", 'output',
+                        "Frequency at which loss and global step are logged.")
 
 def _create_restore_fn(checkpoint_path, saver):
     """Creates a function that restores a model from checkpoint.
@@ -47,50 +55,59 @@ def _create_restore_fn(checkpoint_path, saver):
         tf.logging.info("Successfully loaded checkpoint: %s",
                         os.path.basename(checkpoint_path))
 
-        return _restore_fn
+    return _restore_fn
 
 def insert_space(char, tag):
     if tag == 0 or tag == 3:
         return char + ' '
+    else:
+        return char
 
 def get_final_output(line, predict_tag):
     return ''.join([insert_space(char, tag) for char, tag in zip(line, predict_tag)])
 
 def append_to_file(output_buffer, filename):
-    filename = os.path.join('output', 'out' + filename)
+    filename = os.path.join(FLAGS.output_dir, 'out_' + os.path.split(filename)[-1])
 
     if os.path.exists(filename):
-        append_write = 'a' # append if already exists
+        append_write = 'ab' # append if already exists
     else:
-        append_write = 'w' # make a new file if not
+        append_write = 'wb' # make a new file if not
 
     with open(filename, append_write) as file:
         for item in output_buffer:
-            file.write("%s\n" % item)
+            file.write(item.encode('utf8'))
 
 
 
 
-def main(unused_argv)
+def main(unused_argv):
 
+    #Preprocess before building graph
     #Read vocab file
     with open('data/vocab.pkl', 'rb') as f:
         u = pickle._Unpickler(f)
         u.encoding = 'latin1'
         p = u.load()
 
-    #Prepare for hash table
-    hash_keys = []
-    hash_values = []
-    for k in p._vocab:
-        hash_keys.append(k)
-        hash_values.append(p._vocab[k])
+    if not tf.gfile.IsDirectory(FLAGS.out_dir):
+        tf.logging.info('Create Output dir as %s', FLAGS.out_dir)
+        tf.gfile.MakeDirs(FLAGS.out_dir)
 
-    filename_list = ['data\\output_dir\\icwb2-data\\testing\\as_test.utf8']
-    checkpoint_path = 'saved_model'
+    filename_list = []
+    for dirpath, dirnames, filenames in os.walk(FLAGS.input_file_dir):
+        for filename in filenames:
+            fullpath = os.path.join(dirpath, filename)
+            if 'utf8' in fullpath and 'test' not in fullpath:
+                print(fullpath)
+                filename_list.append(fullpath)
+
+    #filename_list = ['data\\output_dir\\icwb2-data\\testing\\as_test.utf8']
+    checkpoint_path = FLAGS.train_dir
 
     model_config = configuration.ModelConfig()
     inference_config = configuration.InferenceConfig()
+
 
 
     #Build graph for inference
@@ -124,10 +141,16 @@ def main(unused_argv)
             with tf.gfile.GFile(filename) as f:
                 for line in f:
                     input_seqs_list = [p.word_to_id(x) for x in line]
-                    logit, transition_param_array = sess.run([model.logit, transition_param], 
-                        feed_dict = {input_seq_feed:input_seqs_list})
-                    predict_tag = tf.contrib.crf.viterbi_decode(logit, transition_param_array)[0]
-                    output_buffer.append(get_final_output(line, predict_tag))
+
+                    if len(input_seqs_list) == 1:
+                        predict_tag = [0]
+                        output_buffer.append(get_final_output(line, predict_tag))
+
+                    else:
+                        logit, transition_param_p = sess.run([model.logit, transition_param], 
+                            feed_dict = {input_seq_feed:input_seqs_list})
+                        predict_tag = tf.contrib.crf.viterbi_decode(logit, transition_param_p)[0]
+                        output_buffer.append(get_final_output(line, predict_tag))
 
                     if len(output_buffer) >= 1000:
                         append_to_file(output_buffer, filename)

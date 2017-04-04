@@ -93,6 +93,7 @@ ENV/
 #model and data folder
 save_model/
 data/output_dir
+output/
 
 #notebook
 *.ipynb
@@ -102,3 +103,6 @@ data/output_dir
 
 #ini file
 *.ini
+
+#Include processed embedding pkl
+!chr_embedding.pkl
