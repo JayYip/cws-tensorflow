@@ -104,5 +104,3 @@ output/
 #ini file
 *.ini
 
-#Include processed embedding pkl
-!chr_embedding.pkl

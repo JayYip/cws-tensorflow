@@ -26,7 +26,6 @@ Files Description:
 #TODO/BUG FIX:
 1, Unify tradictional chn and simplified chn. Optional.
 2, Fix imbalanced threading
-3, Handle non Chinese chr.
 """
 
 from __future__ import absolute_import
@@ -147,18 +146,16 @@ def download_extract(data_source, download = 'Y'):
             zip_ref.close()
 
         path_list = []
+        train_path = os.path.join(FLAGS.output_dir, 'icwb2-data', 'training')
 
-        for dirpath, dirnames, filenames in os.walk(FLAGS.output_dir):
+        for dirpath, dirnames, filenames in os.walk(train_path):
             for filename in filenames:
                 fullpath = os.path.join(dirpath, filename)
-                if 'utf8' in fullpath and 'test' not in fullpath:
+                if 'utf8' in fullpath:
                     print(fullpath)
                     path_list.append(fullpath)
 
 
-        #filename_queue = tf.train.string_input_producer(path_list)
-        #text_reader = tf.TextLineReader()
-        #key, value = text_reader.read(filename_queue)
 
         return path_list
 
@@ -250,7 +247,6 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
 
     for s in range(len(path_list)):
         filename = path_list[s]
-        #shard = thread_index * num_shards_per_batch + s
         #Create file names for shards
         output_filename = "%s-%s" % (name, filename.split('\\')[-1].split('.')[0])
         output_file = os.path.join(FLAGS.output_dir, output_filename + '.TFRecord')
@@ -271,11 +267,16 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
             for l in f:
                 pos_tag = []
                 final_line = []
-                decoded_line = l.decode('utf8').split(' ')
+                if os.path.split(filename)[-1] in ['msr_training.utf8', 'pku_training.utf8']:
+                    decoded_line = l.decode('utf8').strip().split('  ')
+                elif os.path.split(filename)[-1] == 'as_training.utf8':
+                    decoded_line = l.decode('utf8').strip().split('\u3000')
+                else:
+                    decoded_line = l.decode('utf8').strip().split(' ')
                 decoded_line = [w.strip('\r\n') for w in decoded_line]
 
                 for w in decoded_line:
-                    if len(w) <= 29:
+                    if w and len(w) <= 29:
                         final_line.append(w)
                         pos_tag.append(possible_tags[len(w)-1])
 
@@ -356,7 +357,7 @@ def main(unused_argv):
         # Windows may complain if the folders already exist
         pass
 
-    path_list = download_extract(FLAGS.data_source, 'N')
+    path_list = download_extract(FLAGS.data_source, 'Y')
     vocab = _create_vocab(path_list)
     pickle.dump(vocab, open('vocab.pkl', 'wb'))
     _process_dataset('train', path_list, vocab)

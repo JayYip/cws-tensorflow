@@ -25,7 +25,7 @@ tf.flags.DEFINE_string("input_file_dir", "data\\output_dir\\icwb2-data\\testing\
                        "Path of input files.")
 tf.flags.DEFINE_string("train_dir", "save_model",
                        "Directory for saving and loading model checkpoints.")
-tf.flags.DEFINE_integer("out_dir", 'output',
+tf.flags.DEFINE_string("out_dir", 'output',
                         "Frequency at which loss and global step are logged.")
 
 def _create_restore_fn(checkpoint_path, saver):
@@ -67,7 +67,7 @@ def get_final_output(line, predict_tag):
     return ''.join([insert_space(char, tag) for char, tag in zip(line, predict_tag)])
 
 def append_to_file(output_buffer, filename):
-    filename = os.path.join(FLAGS.output_dir, 'out_' + os.path.split(filename)[-1])
+    filename = os.path.join(FLAGS.out_dir, 'out_' + os.path.split(filename)[-1])
 
     if os.path.exists(filename):
         append_write = 'ab' # append if already exists
@@ -98,8 +98,7 @@ def main(unused_argv):
     for dirpath, dirnames, filenames in os.walk(FLAGS.input_file_dir):
         for filename in filenames:
             fullpath = os.path.join(dirpath, filename)
-            if 'utf8' in fullpath and 'test' not in fullpath:
-                print(fullpath)
+            if fullpath.split('.')[-1] in ['utf8', 'txt', 'csv']:
                 filename_list.append(fullpath)
 
     #filename_list = ['data\\output_dir\\icwb2-data\\testing\\as_test.utf8']
