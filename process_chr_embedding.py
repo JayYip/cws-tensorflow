@@ -21,7 +21,8 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.flags.DEFINE_string("chr_embedding_dir", 'polyglot-zh_char.pkl',
                        "Path to polyglot embedding file")
-
+tf.flags.DEFINE_string("vocab_dir", "data/vocab.pkl",
+                       "Path of vocabulary file.")
 
 
 class Vocabulary(object):
@@ -110,8 +111,7 @@ def main(unused_argv):
     model_config = configuration.ModelConfig()
 
     #Load vocabulary object
-    vocab_dir = os.path.join('data', 'vocab.pkl')
-    vocab = pickle.load(open(vocab_dir, 'rb'))
+    vocab = pickle.load(open(FLAGS.vocab_dir, 'rb'))
 
     original_embedding = download_embedding()
 

@@ -4,7 +4,7 @@
 
 运行环境:
 
-- Python 3.5
+- Python 3.6
 - Tensorflow r1.0
 - Windows/Linux?
 - hanziconv 0.3.2
@@ -28,7 +28,12 @@ python build_pku_msr_input.py \
 从[Polygot](https://sites.google.com/site/rmyeid/projects/polyglot)下载中文字嵌入数据集至项目目录，运行项目目录下process_chr_embedding.py。
 
 ```
-python process_chr_embedding.py
+EMBEDDING_DIR=...
+VOCAB_DIR=...
+
+python process_chr_embedding.py \
+    --chr_embedding_dir=${EMBEDDING_DIR}
+    --vocab_dir=${VOCAB_DIR}
 ```
 
 ### 3. 训练模型
@@ -58,6 +63,7 @@ INF_OUTPUT=...
 python inference.py \
     --input_file_dir=${INF_INPUT} \
     --train_dir=${MODEL} \
+    --vocab_dir=${VOCAB_DIR} \
     --out_dir=${INF_OUTPUT}
 ```
 

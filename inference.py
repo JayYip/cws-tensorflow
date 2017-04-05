@@ -23,6 +23,8 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.flags.DEFINE_string("input_file_dir", "data\\output_dir\\icwb2-data\\testing\\",
                        "Path of input files.")
+tf.flags.DEFINE_string("vocab_dir", "data/vocab.pkl",
+                       "Path of vocabulary file.")
 tf.flags.DEFINE_string("train_dir", "save_model",
                        "Directory for saving and loading model checkpoints.")
 tf.flags.DEFINE_string("out_dir", 'output',
@@ -85,7 +87,7 @@ def main(unused_argv):
 
     #Preprocess before building graph
     #Read vocab file
-    with open('data/vocab.pkl', 'rb') as f:
+    with open(FLAGS.vocab_dir, 'rb') as f:
         u = pickle._Unpickler(f)
         u.encoding = 'latin1'
         p = u.load()

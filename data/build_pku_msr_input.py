@@ -23,9 +23,6 @@ Processing Description:
 Files Description:
 
 
-#TODO/BUG FIX:
-1, Unify tradictional chn and simplified chn. Optional.
-2, Fix imbalanced threading
 """
 
 from __future__ import absolute_import
