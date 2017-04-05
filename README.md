@@ -4,8 +4,11 @@
 
 运行环境:
 
+- Python 3.5
 - Tensorflow r1.0
 - Windows/Linux?
+- hanziconv 0.3.2
+- numpy
 
 ## 训练模型
 

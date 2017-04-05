@@ -42,6 +42,7 @@ import threading
 from datetime import datetime
 import sys
 import pickle
+from hanziconv.hanziconv import HanziConv
 
 import tensorflow as tf
 
@@ -100,15 +101,41 @@ def tag_to_id(t):
     elif t == 'e':
         return 3
 
+#Line processing functions
+
 def split_list(alist, wanted_parts=1):
     length = len(alist)
     return [ alist[i*length // wanted_parts: (i+1)*length // wanted_parts] 
              for i in range(wanted_parts) ]
 
+def process_line_msr_pku(l):
+    decoded_line = l.decode('utf8').strip().split('  ')
+    return [w.strip('\r\n') for w in decoded_line]
+
+def process_line_as_training(l):
+    decoded_line = HanziConv.toSimplified(l.decode('utf8')).strip().split('\u3000')
+    return [w.strip('\r\n') for w in decoded_line]
+
+def process_line_cityu(l):
+    decoded_line = HanziConv.toSimplified(l.decode('utf8')).strip().split(' ')
+    return [w.strip('\r\n') for w in decoded_line]
+
+def get_process_fn(filename):
+
+    if filename in ['msr_training.utf8', 'pku_training.utf8']:
+        return process_line_msr_pku
+
+    elif filename == 'as_training.utf8':
+        return process_line_as_training
+
+    elif filename == 'cityu_training.utf8':
+        return process_line_cityu
 
 def _is_valid_data_source(data_source):
     return data_source in ['pku-msr', 'wiki-chn']
 
+
+# Convert feature functions
 def _int64_feature(value):
   """Wrapper for inserting an int64 Feature into a SequenceExample proto."""
   return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
@@ -126,8 +153,6 @@ def _int64_feature_list(values):
 def _bytes_feature_list(values):
   """Wrapper for inserting a bytes FeatureList into a SequenceExample proto."""
   return tf.train.FeatureList(feature=[_bytes_feature(v) for v in values])
-
-
 
 
 def download_extract(data_source, download = 'Y'):
@@ -182,7 +207,7 @@ def _create_vocab(path_list):
         print("Processing"+file_path)
         with open(file_path, 'rb') as f:
             for l in f:
-                counter.update(l.decode('utf8'))
+                counter.update(HanziConv.toSimplified(l.decode('utf8')))
                 row_count = row_count + 1
 
     print("Total char:", len(counter))
@@ -264,16 +289,14 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
         
         sequence_example = None
         with open(filename, 'rb') as f:
+
+            process_fn = get_process_fn(os.path.split(filename)[-1])
+
             for l in f:
                 pos_tag = []
                 final_line = []
-                if os.path.split(filename)[-1] in ['msr_training.utf8', 'pku_training.utf8']:
-                    decoded_line = l.decode('utf8').strip().split('  ')
-                elif os.path.split(filename)[-1] == 'as_training.utf8':
-                    decoded_line = l.decode('utf8').strip().split('\u3000')
-                else:
-                    decoded_line = l.decode('utf8').strip().split(' ')
-                decoded_line = [w.strip('\r\n') for w in decoded_line]
+
+                decoded_line = process_fn(l)
 
                 for w in decoded_line:
                     if w and len(w) <= 29:
@@ -358,8 +381,21 @@ def main(unused_argv):
         pass
 
     path_list = download_extract(FLAGS.data_source, 'Y')
+
     vocab = _create_vocab(path_list)
     pickle.dump(vocab, open('vocab.pkl', 'wb'))
+
+    trimmed_path_list = []
+    for filename in path_list:
+        output_filename = "%s-%s" % ('train', filename.split('\\')[-1].split('.')[0])
+        output_file = os.path.join(FLAGS.output_dir, output_filename + '.TFRecord')
+        if os.path.isfile(output_file):
+            pass
+        else:
+            trimmed_path_list.append(filename)
+
+    path_list = trimmed_path_list
+
     _process_dataset('train', path_list, vocab)
 
 
