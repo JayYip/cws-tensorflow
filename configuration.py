@@ -65,7 +65,7 @@ class TrainingConfig(object):
         self.max_checkpoints_to_keep = 5
 
         #Set training step
-        self.training_step = 5000
+        self.training_step = 10000
 
 class InferenceConfig(object):
 

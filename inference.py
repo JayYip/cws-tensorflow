@@ -12,8 +12,9 @@ from __future__ import print_function
 
 import tensorflow as tf
 import pickle
-
 import os
+from hanziconv.hanziconv import HanziConv
+
 from ops import input_ops
 from ops.vocab import Vocabulary
 import configuration
@@ -141,17 +142,18 @@ def main(unused_argv):
             output_buffer = []
             with tf.gfile.GFile(filename) as f:
                 for line in f:
-                    input_seqs_list = [p.word_to_id(x) for x in line]
+                    l = HanziConv.toSimplified(line)
+                    input_seqs_list = [p.word_to_id(x) for x in l]
 
                     if len(input_seqs_list) == 1:
                         predict_tag = [0]
-                        output_buffer.append(get_final_output(line, predict_tag))
+                        output_buffer.append(get_final_output(l, predict_tag))
 
                     else:
                         logit, transition_param_p = sess.run([model.logit, transition_param], 
                             feed_dict = {input_seq_feed:input_seqs_list})
                         predict_tag = tf.contrib.crf.viterbi_decode(logit, transition_param_p)[0]
-                        output_buffer.append(get_final_output(line, predict_tag))
+                        output_buffer.append(get_final_output(l, predict_tag))
 
                     if len(output_buffer) >= 1000:
                         append_to_file(output_buffer, filename)

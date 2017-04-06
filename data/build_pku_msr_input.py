@@ -177,7 +177,13 @@ def download_extract(data_source, download = 'Y'):
                     print(fullpath)
                     path_list.append(fullpath)
 
+        txt_rm_path = os.path.join(FLAGS.output_dir, 'icwb2-data')
 
+        for dirpath, dirnames, filenames in os.walk(txt_rm_path):
+            for filename in filenames:
+                fullpath = os.path.join(dirpath, filename)
+                if 'txt' in fullpath:
+                    os.remove(fullpath)
 
         return path_list
 
