@@ -40,8 +40,6 @@ class ModelConfig(object):
         #Regularization
         self.regularization = 0.0001
         
-        #TODO
-        self.layer_norm = True
 
 class TrainingConfig(object):
     """docstring for TrainingConfig"""
@@ -65,10 +63,6 @@ class TrainingConfig(object):
         self.max_checkpoints_to_keep = 5
 
         #Set training step
-        self.training_step = 50
+        self.training_step = 100000
 
-class InferenceConfig(object):
 
-    def __init__(self):
-        
-        self.batch_size = 5120

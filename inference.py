@@ -107,7 +107,6 @@ def main(unused_argv):
     checkpoint_path = FLAGS.train_dir
 
     model_config = configuration.ModelConfig()
-    inference_config = configuration.InferenceConfig()
 
 
 
