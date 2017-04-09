@@ -56,7 +56,8 @@ def main(unused_argv):
         #Set embedding table
         embedding = tf.convert_to_tensor(chr_embedding, dtype = tf.float32)
         with tf.variable_scope('seq_embedding') as seq_embedding_scope:
-            chr_embedding_var = tf.get_variable(name = 'chr_embedding', shape = (shape[0], shape[1]))
+            chr_embedding_var = tf.get_variable(name = 'chr_embedding', 
+                shape = (shape[0], shape[1]), trainable=False)
             embedding_assign_op = chr_embedding_var.assign(embedding)
 
         #Build model
@@ -103,7 +104,7 @@ def main(unused_argv):
     tf.contrib.slim.learning.train(
         train_op,
         train_dir,
-        log_every_n_steps=FLAGS.log_every_n_steps,
+        log_every_n_steps=1,
         graph=g,
         global_step=model.global_step,
         number_of_steps=train_config.training_step,

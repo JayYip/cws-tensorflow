@@ -22,7 +22,7 @@ from lstm_based_cws_model import LSTMCWS
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.flags.DEFINE_string("input_file_dir", "data\\output_dir\\icwb2-data\\testing\\",
+tf.flags.DEFINE_string("input_file_dir", "data/output_dir/icwb2-data/testing/",
                        "Path of input files.")
 tf.flags.DEFINE_string("vocab_dir", "data/vocab.pkl",
                        "Path of vocabulary file.")
@@ -104,7 +104,6 @@ def main(unused_argv):
             if fullpath.split('.')[-1] in ['utf8', 'txt', 'csv']:
                 filename_list.append(fullpath)
 
-    #filename_list = ['data\\output_dir\\icwb2-data\\testing\\as_test.utf8']
     checkpoint_path = FLAGS.train_dir
 
     model_config = configuration.ModelConfig()
@@ -120,8 +119,9 @@ def main(unused_argv):
 
         #Add transition var to graph
         with tf.variable_scope('tag_inf') as scope:
-            transition_param = tf.get_variable(name = 'transition_param', 
-                shape = [model_config.num_tag,model_config.num_tag])
+            transition_param = tf.Variable(name = 'transitions', 
+                initial_value = 0,
+                validate_shape=False)
 
         #Build model
         model = LSTMCWS(model_config, 'inference')

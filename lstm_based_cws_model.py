@@ -18,6 +18,18 @@ import tensorflow as tf
 import os
 from ops import input_ops
 
+def variable_summaries(var):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope('summaries'):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+          stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)
+
 
 class LSTMCWS(object):
     """docstring for LSTMCWS"""
@@ -127,7 +139,7 @@ class LSTMCWS(object):
         with tf.variable_scope('seq_embedding', reuse = True) as seq_embedding_scope:
             #chr_embedding = tf.Variable(self.embedding_tensor, name="chr_embedding")
             if self.is_training():
-                chr_embedding = tf.get_variable(name="chr_embedding", validate_shape = False)
+                chr_embedding = tf.get_variable(name="chr_embedding", validate_shape = False, trainable=False)
             else:
                 chr_embedding = tf.Variable(tf.zeros([10]), validate_shape=False, name="chr_embedding")
 
@@ -198,23 +210,25 @@ class LSTMCWS(object):
                 weights_initializer = self.initializer,
                 scope = logit_scope)
 
+        softmax = tf.nn.softmax(logits = logit)
+
         if not self.is_training():
             # In inference, logit will be returned since the decode fn only takes numpy array.
-            logit = tf.squeeze(logit)
+            softmax = tf.squeeze(softmax)
 
-            self.logit = logit
+            self.logit = softmax
 
         else:
             with tf.variable_scope('tag_inf') as tag_scope:
                 sequence_length = tf.reduce_sum(self.input_mask, 1)
-                sentence_likelihood, transition_param = tf.contrib.crf.crf_log_likelihood(inputs = logit,
+                sentence_likelihood, transition_param = tf.contrib.crf.crf_log_likelihood(inputs = softmax,
                     tag_indices = tf.to_int32(self.tag_seqs),
                     sequence_lengths = sequence_length)
 
-                share_transition_param = tf.get_variable(name = 'transition_param', 
-                    shape = [self.config.num_tag,self.config.num_tag],
-                    initializer = self.initializer)
-                ass_op = share_transition_param.assign(transition_param)
+                #share_transition_param = tf.get_variable(name = 'transition_param', 
+                #    shape = [self.config.num_tag,self.config.num_tag],
+                #    initializer = self.initializer)
+                #ass_op = share_transition_param.assign(transition_param)
 
             batch_loss = tf.reduce_sum(-sentence_likelihood)
 

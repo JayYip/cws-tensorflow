@@ -60,7 +60,7 @@ FLAGS = tf.flags.FLAGS
 class Vocabulary(object):
   """Simple vocabulary wrapper."""
 
-  def __init__(self, vocab, unk_id, unk_word = '<UNK>'):
+  def __init__(self, vocab, id_vocab, unk_id, unk_word = '<UNK>'):
     """Initializes the vocabulary.
 
     Args:
@@ -68,8 +68,10 @@ class Vocabulary(object):
       unk_id: Id of the special 'unknown' word.
     """
     self._vocab = vocab
+    self._id_vocab = id_vocab
     self._unk_id = unk_id
-    self._vocab[unk_word] = 0
+    self._vocab[unk_word] = len(self._vocab)
+    self._id_vocab[len(self._vocab)] = unk_word
 
   def word_to_id(self, word):
     """Returns the integer id of a word string."""
@@ -81,9 +83,9 @@ class Vocabulary(object):
   def id_to_word(self, word_id):
     """Returns the word string of an integer word id."""
     if word_id >= len(self._vocab):
-      return self._vocab[self.unk_id]
+      return self._id_vocab[self.unk_id]
     else:
-      return self._vocab[word_id]
+      return self._id_vocab[word_id]
 
 def tag_to_id(t):
     if t == 's':
@@ -234,7 +236,8 @@ def _create_vocab(path_list):
     reverse_vocab = [x[0] for x in word_counts]
     unk_id = len(reverse_vocab)
     vocab_dict = dict([(x, y) for (y, x) in enumerate(reverse_vocab)])
-    vocab = Vocabulary(vocab_dict, unk_id)
+    id_vocab_dict = dict([(y, x) for (y, x) in enumerate(reverse_vocab)])
+    vocab = Vocabulary(vocab_dict, id_vocab_dict, unk_id)
 
     return vocab
 
@@ -383,7 +386,7 @@ def main(unused_argv):
         # Windows may complain if the folders already exist
         pass
 
-    path_list = download_extract(FLAGS.data_source, 'Y')
+    path_list = download_extract(FLAGS.data_source, 'N')
 
     vocab = _create_vocab(path_list)
     pickle.dump(vocab, open('vocab.pkl', 'wb'))
@@ -399,7 +402,7 @@ def main(unused_argv):
 
     path_list = trimmed_path_list
 
-    _process_dataset('train', path_list, vocab)
+    #_process_dataset('train', path_list, vocab)
 
 
 if __name__ == '__main__':
