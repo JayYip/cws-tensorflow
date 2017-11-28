@@ -5,8 +5,8 @@
 运行环境:
 
 - Python 3.5
-- Tensorflow r1.0
-- Windows/Linux?
+- Tensorflow r1.4
+- Windows
 - hanziconv 0.3.2
 - numpy
 
