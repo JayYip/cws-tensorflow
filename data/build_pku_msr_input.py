@@ -55,6 +55,7 @@ tf.flags.DEFINE_integer("num_threads", 4,
                         "Number of threads to preprocess the images.")
 tf.flags.DEFINE_integer("window_size", 5,
                         "The window size of skip-gram model")
+tf.flags.DEFINE_integer("seq_max_len", 30, "Max length of seqence")
 FLAGS = tf.flags.FLAGS
 
 
@@ -230,17 +231,22 @@ def _to_sequence_example(decoded_str, pos_tag_str, vocab):
 
     #Transfor word to word_id
     content_id = [vocab.word_to_id(c) for c in decoded_str]
+    content_id = content_id[:FLAGS.seq_max_len]
     tag_id = [tag_to_id(t) for t in pos_tag_str]
+    tag_id = tag_id[:FLAGS.seq_max_len]
+    length = min(FLAGS.seq_max_len, len(content_id))
 
 
     feature_lists = tf.train.FeatureLists(feature_list={
-        "text/content_id": _int64_feature_list(content_id),
-        #"text/left": _bytes_feature_list(left),
-        "text/tag_id": _int64_feature_list(tag_id),
-        #"text/right": _bytes_feature_list(right)
+        "content_id": _int64_feature_list(content_id),
+        "tag_id": _int64_feature_list(tag_id)
         })
 
-    sequence_example = tf.train.SequenceExample(feature_lists=feature_lists)
+    context = tf.train.Features(feature={
+        "length": _int64_feature(length)
+    })
+
+    sequence_example = tf.train.SequenceExample(feature_lists=feature_lists, context = context)
 
     return sequence_example
 
@@ -385,6 +391,9 @@ def main(unused_argv):
 
     path_list = get_path(data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data', 'training'))
 
+    vocab = _create_vocab(path_list)
+    pickle.dump(vocab, open('vocab.pkl', 'wb'))
+
     trimmed_path_list = []
     for filename in path_list:
         output_filename = "%s-%s" % ('train', filename.split('\\')[-1].split('.')[0])
@@ -397,6 +406,8 @@ def main(unused_argv):
     path_list = trimmed_path_list
 
     _process_dataset('train', path_list, vocab)
+
+    path_list = get_path(data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data', 'gold'), mode = 'test')
 
     trimmed_path_list = []
     for filename in path_list:

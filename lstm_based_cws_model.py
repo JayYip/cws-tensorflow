@@ -33,9 +33,6 @@ class LSTMCWS(object):
         self.config = config
         self.mode = mode
 
-        #Set up reader
-        self.reader = tf.TFRecordReader()
-
         #Set up initializer
         self.initializer = tf.contrib.layers.xavier_initializer(uniform=True, 
             seed=None, dtype=tf.float32)
@@ -48,9 +45,6 @@ class LSTMCWS(object):
 
         #Set up global step tensor
         self.global_step = None
-
-        #Set up embedding table
-        self.embedding_tensor = None
 
     def is_training(self):
         return self.mode == 'train'
@@ -67,53 +61,53 @@ class LSTMCWS(object):
             self.tag_input_seq: A tensor of input sequence to tag inference model with the shape of [batch_size, padding_size -1]
             self.tag_output_seq: A tensor of input sequence to tag inference model with the shape of [batch_size, padding_size -1]
         """
-        #Get all TFRecord path into a list
-        data_files = []
-        file_pattern = '*.TFRecord'
-        data_files.extend(tf.gfile.Glob(file_pattern))
-        if not data_files:
-          tf.logging.fatal("Found no input files matching %s", file_pattern)
-        else:
-          tf.logging.info("Prefetching values from %d files matching %s",
-                          len(data_files), file_pattern)
 
-
-        #Create file queue
         if self.is_training():
-            filename_queue = tf.train.string_input_producer(
-                data_files, shuffle = True, capacity = 16, name = 'filename_input_queue')
+            #Get all TFRecord path into a list
+            data_files = []
+            file_pattern = '*.TFRecord'
+            data_files.extend(tf.gfile.Glob(file_pattern))
 
-            #Create example queue
-            example_queue = input_ops.example_queue_shuffle(self.reader, filename_queue, 
-                self.is_training(), capacity = 50000, num_reader_threads = self.config.num_preprocess_thread)
+            data_files = [x for x in data_files if os.path.split(x)[-1].startswith(self.mode)]
 
-            #Parse one example
-            input_seq_queue, tag_seq_queue = input_ops.parse_example_queue(example_queue, 
-                self.config.context_feature_name, self.config.tag_feature_name)
+            if not data_files:
+                tf.logging.fatal("Found no input files matching %s", file_pattern)
+            else:
+                tf.logging.info("Prefetching values from %d files matching %s",
+                            len(data_files), file_pattern)
 
-            
-            seq_length = tf.expand_dims(tf.subtract(tf.shape(tag_seq_queue)[0], 1),0)
-            indicator = tf.ones(seq_length, dtype=tf.int32)
+            def _parse_wrapper(l):
+                return input_ops.parse_example_queue(l, self.config)
 
-            input_seqs, tag_seqs, input_mask = tf.train.batch(
-                [input_seq_queue, tag_seq_queue, indicator], 
-                batch_size=self.config.batch_size,
-                capacity=50000,
-                dynamic_pad=True,
-                name="batch_and_pad")
+            dataset = tf.data.TFRecordDataset(data_files).map(_parse_wrapper).repeat(10000)
+            if self.is_training():
+                dataset = dataset.shuffle(buffer_size=256)
+
+            dataset = dataset.padded_batch(batch_size=self.config.batch_size, 
+                                        padded_shapes = (tf.TensorShape([self.config.seq_max_len]), 
+                                                            tf.TensorShape([self.config.seq_max_len]),
+                                                            tf.TensorShape([]))).filter(
+                                                                lambda x, y, z: tf.equal(tf.shape(x)[0], self.config.batch_size) )
+
+
+
+            iterator = dataset.make_one_shot_iterator()
+
+            input_seqs, tag_seqs, sequence_length  = iterator.get_next()
 
         else:
             #Inference
             input_seq_feed = tf.get_default_graph().get_tensor_by_name("input_seq_feed:0")
             input_seqs = tf.expand_dims(input_seq_feed, 0)
             input_mask = tf.ones(tf.shape(input_seqs), dtype=tf.int32)
+            sequence_length = tf.add(tf.reduce_sum(input_mask, 1), 1)
 
             tag_seqs = None
 
         
         self.input_seqs = input_seqs
         self.tag_seqs = tag_seqs
-        self.input_mask = input_mask
+        self.sequence_length = sequence_length
 
 
     def build_chr_embedding(self):
@@ -175,10 +169,9 @@ class LSTMCWS(object):
 
 
             #Run LSTM with sequence_length timesteps
-            sequence_length = tf.add(tf.reduce_sum(self.input_mask, 1), 1)
             lstm_output, _ = tf.nn.dynamic_rnn(cell = lstm_cell,
                 inputs = self.seq_embedding,
-                sequence_length = sequence_length,
+                sequence_length = self.sequence_length,
                 initial_state = init_state,
                 dtype = tf.float32,
                 scope = lstm_scope)
@@ -207,10 +200,12 @@ class LSTMCWS(object):
 
         else:
             with tf.variable_scope('tag_inf') as tag_scope:
-                sequence_length = tf.reduce_sum(self.input_mask, 1)
                 sentence_likelihood, transition_param = tf.contrib.crf.crf_log_likelihood(inputs = logit,
                     tag_indices = tf.to_int32(self.tag_seqs),
-                    sequence_lengths = sequence_length)
+                    sequence_lengths = self.sequence_length)
+
+                self.predict_tag, _ = tf.contrib.crf.crf_decode(
+                    logit, transition_param, self.sequence_length)
 
             batch_loss = tf.reduce_sum(-sentence_likelihood)
 
@@ -222,10 +217,6 @@ class LSTMCWS(object):
 
             tf.summary.scalar('losses/batch_loss', batch_loss)
             tf.summary.scalar('losses/total_loss', total_loss)
-
-            #For test only
-            self.logit = logit
-            self.sentence_likelihood = sentence_likelihood
 
             #Output loss
             self.batch_loss = batch_loss

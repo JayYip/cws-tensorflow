@@ -15,8 +15,9 @@ class ModelConfig(object):
     def __init__(self):
         
         #Set the feature name of context and tags
-        self.context_feature_name = 'text/content_id'
-        self.tag_feature_name = 'text/tag_id'
+        self.context_feature_name = 'content_id'
+        self.tag_feature_name = 'tag_id'
+        self.length_name = 'length'
 
         #Number of thread for prefetching SequenceExample
         #self.num_input_reader_thread = 2
@@ -39,22 +40,24 @@ class ModelConfig(object):
         self.margin_loss_discount = 0.2
         #Regularization
         self.regularization = 0.0001
+
+        self.seq_max_len = 30
         
 
 class TrainingConfig(object):
     """docstring for TrainingConfig"""
     def __init__(self):
         
-        self.num_examples_per_epoch = 5120
+        self.num_examples_per_epoch = 512000
 
         #Optimizer for training
-        self.optimizer = 'SGD'
+        self.optimizer = 'Adam'
 
         #Learning rate
-        self.initial_learning_rate = 1.0
+        self.initial_learning_rate = 0.005
         #If decay factor <= 0 then not decay
         self.learning_rate_decay_factor = 0.5
-        self.num_epochs_per_decay = 5.0
+        self.num_epochs_per_decay = 2
 
         #Gradient clipping
         self.clip_gradients = 3.0
@@ -63,6 +66,8 @@ class TrainingConfig(object):
         self.max_checkpoints_to_keep = 5
 
         #Set training step
-        self.training_step = 100000
+        self.training_step = 1000
+
+        self.embedding_random = True
 
 

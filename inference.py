@@ -20,16 +20,18 @@ from ops.vocab import Vocabulary
 import configuration
 from lstm_based_cws_model import LSTMCWS
 
-FLAGS = tf.app.flags.FLAGS
 
-tf.flags.DEFINE_string("input_file_dir", "data/output_dir/icwb2-data/testing/",
+
+tf.flags.DEFINE_string("input_file_dir", "data/download_dir/icwb2-data/gold/",
                        "Path of input files.")
-tf.flags.DEFINE_string("vocab_dir", "data/vocab.pkl",
+tf.flags.DEFINE_string("vocab_dir", "data/download_dir/vocab.pkl",
                        "Path of vocabulary file.")
 tf.flags.DEFINE_string("train_dir", "save_model",
                        "Directory for saving and loading model checkpoints.")
 tf.flags.DEFINE_string("out_dir", 'output',
                         "Frequency at which loss and global step are logged.")
+
+FLAGS = tf.app.flags.FLAGS
 
 def _create_restore_fn(checkpoint_path, saver):
     """Creates a function that restores a model from checkpoint.
@@ -79,10 +81,34 @@ def append_to_file(output_buffer, filename):
 
     with open(filename, append_write) as file:
         for item in output_buffer:
-            file.write(item.encode('utf8'))
+            file.write(item.encode('utf8')+ b'\n')
 
+def tag_to_id(t):
+    if t == 's':
+        return 0
 
+    elif t == 'b':
+        return 1
 
+    elif t == 'm':
+        return 2
+
+    elif t == 'e':
+        return 3
+
+def seq_acc(seq1, seq2):
+    correct = 0
+    if len(seq1) != len(seq2):
+        print('Not equal seq length')
+        print(seq1)
+        print(seq2)
+        raise ValueError
+
+    for seq_ind, char in enumerate(seq1):
+        if char == seq2[seq_ind]:
+            correct += 1
+    
+    return correct
 
 def main(unused_argv):
 
@@ -101,7 +127,7 @@ def main(unused_argv):
     for dirpath, dirnames, filenames in os.walk(FLAGS.input_file_dir):
         for filename in filenames:
             fullpath = os.path.join(dirpath, filename)
-            if fullpath.split('.')[-1] in ['utf8', 'txt', 'csv']:
+            if fullpath.split('.')[-1] in ['utf8'] and 'test' in fullpath:
                 filename_list.append(fullpath)
 
     checkpoint_path = FLAGS.train_dir
@@ -109,6 +135,13 @@ def main(unused_argv):
     model_config = configuration.ModelConfig()
 
 
+    #Create possible tags for fast lookup
+    possible_tags = []
+    for i in range(1, 300):
+        if i == 1:
+            possible_tags.append('s')
+        else:
+            possible_tags.append('b' + 'm' * (i - 2) + 'e')
 
     #Build graph for inference
     g = tf.Graph()
@@ -139,20 +172,53 @@ def main(unused_argv):
 
         for filename in filename_list:
             output_buffer = []
-            with tf.gfile.GFile(filename) as f:
+            num_correct = 0
+            num_total = 0
+            proc_fn = input_ops.get_process_fn(filename)
+            with tf.gfile.GFile(filename, 'rb') as f:
                 for line in f:
-                    l = HanziConv.toSimplified(line)
-                    input_seqs_list = [p.word_to_id(x) for x in l]
+                    l = proc_fn(line)
+                    input_seqs_list = [p.word_to_id(x) for x in ''.join(l)]
 
-                    if len(input_seqs_list) == 1:
+                    #get seqence label
+                    #str_input_seqs_list = [str(x) for x in input_seqs_list]
+                    input_label = []
+                    for w in l:
+                        if len(w) > 0 and len(w) <= 299:
+                            input_label.append(possible_tags[len(w)-1])
+                        elif len(w) == 0:
+                            pass
+                        else:
+                            input_label.append('s')
+
+                    str_input_label = ''.join(input_label)
+                    input_label = [tag_to_id(x) for x in str_input_label]
+
+
+                    #get input sequence
+                    input_seqs_list = [x for x in input_seqs_list if x != 1]
+
+
+                    if len(input_seqs_list) <= 1:
                         predict_tag = [0]
                         output_buffer.append(get_final_output(l, predict_tag))
 
                     else:
-                        logit, transition_param_p = sess.run([model.logit, transition_param], 
+                        predict_tag = sess.run(model.predict_tag, 
                             feed_dict = {input_seq_feed:input_seqs_list})
-                        predict_tag = tf.contrib.crf.viterbi_decode(logit, transition_param_p)[0]
+
+                        if len(predict_tag) != len(input_seqs_list):
+                            print('predict not right')
+                            print(l)
+                        if len(input_seqs_list) != len(input_label):
+                            print('label not right')
+                            print(l)
+                            print(str_input_label)
+
                         output_buffer.append(get_final_output(l, predict_tag))
+
+                        num_correct += seq_acc(input_label, predict_tag)
+                        num_total += len(input_label)
 
                     if len(output_buffer) >= 1000:
                         append_to_file(output_buffer, filename)
@@ -161,6 +227,9 @@ def main(unused_argv):
                 if output_buffer:
                     append_to_file(output_buffer, filename)
 
+            print('%s Acc: %f' % (filename, num_correct / num_total))
+            print('%s Correct: %d' % (filename, num_correct))
+            print('%s Total: %d' % (filename, num_total))
 
 if __name__ == '__main__':
     tf.app.run()

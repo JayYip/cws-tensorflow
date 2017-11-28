@@ -14,6 +14,7 @@ import tensorflow as tf
 
 import configuration
 from lstm_based_cws_model import LSTMCWS
+from ops.vocab import Vocabulary
 
 import pickle
 
@@ -24,7 +25,7 @@ tf.flags.DEFINE_string("input_file_dir", "data\output_dir",
                        "Path of TFRecord input files.")
 tf.flags.DEFINE_string("train_dir", "save_model",
                        "Directory for saving and loading model checkpoints.")
-tf.flags.DEFINE_integer("log_every_n_steps", 10,
+tf.flags.DEFINE_integer("log_every_n_steps", 100,
                         "Frequency at which loss and global step are logged.")
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -47,22 +48,25 @@ def main(unused_argv):
         tf.gfile.MakeDirs(train_dir)
 
     #Load chr emdedding table
-    chr_embedding = pickle.load(open('chr_embedding.pkl', 'rb'))
-    shape = chr_embedding.shape
+    if train_config.embedding_random:
+        shape = [len(pickle.load(open('data/vocab.pkl', 'rb'))._vocab), model_config.embedding_size]
+    else:
+        chr_embedding = pickle.load(open('chr_embedding.pkl', 'rb'))
+        shape = chr_embedding.shape
 
     #Build graph
     g = tf.Graph()
     with g.as_default():
         #Set embedding table
-        embedding = tf.convert_to_tensor(chr_embedding, dtype = tf.float32)
         with tf.variable_scope('seq_embedding') as seq_embedding_scope:
             chr_embedding_var = tf.get_variable(name = 'chr_embedding', 
-                shape = (shape[0], shape[1]), trainable=False)
-            embedding_assign_op = chr_embedding_var.assign(embedding)
+                shape = (shape[0], shape[1]), trainable=True, initializer=tf.initializers.orthogonal(-0.1, 0.1))
+            if not train_config.embedding_random:
+                embedding = tf.convert_to_tensor(chr_embedding, dtype = tf.float32)
+                embedding_assign_op = chr_embedding_var.assign(embedding)
 
         #Build model
         model = LSTMCWS(model_config, 'train')
-        model.embedding_tensor = embedding
         print('Building model...')
         model.build()
 

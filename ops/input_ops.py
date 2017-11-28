@@ -12,32 +12,34 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-def parse_example_queue(example_queue, context_feature_name, tag_feature_name):
-  """ Read one example.
-  This function read one example and return context sequence and tag sequence
-  correspondingly. 
+from hanziconv.hanziconv import HanziConv
 
-  Args:
-    filename_queue: A filename queue returned by string_input_producer
-    context_feature_name: Context feature name in TFRecord. Set in ModelConfig
-    tag_feature_name: Tag feature name in TFRecord. Set in ModelConfig
+def parse_example_queue(example_queue, config):
+      """ Read one example.
+      This function read one example and return context sequence and tag sequence
+      correspondingly. 
 
-  Returns:
-    input_seq: An int32 Tensor with different length.
-    tag_seq: An int32 Tensor with different length.
-  """
-  #Read TFRecord from filename queue
-  #_, serialized_example = reader.read(filename_queue)
-  serialized_example = example_queue.dequeue()
+      Args:
+        filename_queue: A filename queue returned by string_input_producer
+        context_feature_name: Context feature name in TFRecord. Set in ModelConfig
+        tag_feature_name: Tag feature name in TFRecord. Set in ModelConfig
 
-  #Parse one example
-  _, features = tf.parse_single_sequence_example(serialized_example, 
-    sequence_features = {
-      context_feature_name: tf.FixedLenSequenceFeature([], dtype=tf.int64),
-      tag_feature_name: tf.FixedLenSequenceFeature([], dtype = tf.int64)
-    })
+      Returns:
+        input_seq: An int32 Tensor with different length.
+        tag_seq: An int32 Tensor with different length.
+      """
 
-  return (features[context_feature_name], features[tag_feature_name])
+      #Parse one example
+      context, features = tf.parse_single_sequence_example(example_queue, 
+        context_features={
+                  config.length_name: tf.FixedLenFeature([], dtype=tf.int64)
+              },
+        sequence_features = {
+          config.context_feature_name: tf.FixedLenSequenceFeature([], dtype=tf.int64),
+          config.tag_feature_name: tf.FixedLenSequenceFeature([], dtype = tf.int64)
+        })
+
+      return (features[config.context_feature_name], features[config.tag_feature_name], context[config.length_name])
 
 def example_queue_shuffle(reader, filename_queue, is_training, example_queue_name = 'example_queue', capacity = 50000, num_reader_threads = 1):
   """
@@ -87,3 +89,26 @@ def example_queue_shuffle(reader, filename_queue, is_training, example_queue_nam
       tf.cast(example_queue.size(), tf.float32) * (1. / capacity))
 
   return example_queue
+
+def process_line_msr_pku(l):
+    decoded_line = l.decode('utf8').strip().split('  ')
+    return [w.strip('\r\n') for w in decoded_line]
+
+def process_line_as_training(l):
+    decoded_line = HanziConv.toSimplified(l.decode('utf8')).strip().split('\u3000')
+    return [w.strip('\r\n') for w in decoded_line]
+
+def process_line_cityu(l):
+    decoded_line = HanziConv.toSimplified(l.decode('utf8')).strip().split(' ')
+    return [w.strip('\r\n') for w in decoded_line]
+
+def get_process_fn(filename):
+
+    if 'msr' in filename or 'pk' in filename:
+        return process_line_msr_pku
+
+    elif 'as' in filename:
+        return process_line_as_training
+
+    elif 'cityu' in filename:
+        return process_line_cityu
