@@ -13,9 +13,9 @@ Chinese Wiki Address: PENDING
 Each file is a TFRecord
 
 Output:
-output_dir/train-00000-of-00xxx
+download_dir/train-00000-of-00xxx
 ...
-output_dir/train-00127-of-00xxx
+download_dir/train-00127-of-00xxx
 
 Processing Description:
 
@@ -40,17 +40,18 @@ from datetime import datetime
 import sys
 import pickle
 from hanziconv.hanziconv import HanziConv
+from multiprocessing import Process
 
 import tensorflow as tf
 
 
 tf.flags.DEFINE_string("data_source", "pku-msr",
                        "Specify the data source: pku-msr or wiki-chn")
-tf.flags.DEFINE_string("output_dir", "output_dir", "Output data directory.")
+tf.flags.DEFINE_string("download_dir", "download_dir", "Output data directory.")
 tf.flags.DEFINE_string("word_counts_output_file", "word_count", "Word Count output dir")
 tf.flags.DEFINE_integer("train_shards", 128,
                         "Number of shards in training TFRecord files.")
-tf.flags.DEFINE_integer("num_threads", 2,
+tf.flags.DEFINE_integer("num_threads", 4,
                         "Number of threads to preprocess the images.")
 tf.flags.DEFINE_integer("window_size", 5,
                         "The window size of skip-gram model")
@@ -121,13 +122,13 @@ def process_line_cityu(l):
 
 def get_process_fn(filename):
 
-    if filename in ['msr_training.utf8', 'pku_training.utf8']:
+    if 'msr' in filename or 'pk' in filename:
         return process_line_msr_pku
 
-    elif filename == 'as_training.utf8':
+    elif 'as' in filename:
         return process_line_as_training
 
-    elif filename == 'cityu_training.utf8':
+    elif 'cityu' in filename:
         return process_line_cityu
 
 def _is_valid_data_source(data_source):
@@ -163,31 +164,11 @@ def download_extract(data_source, download = 'Y'):
         if download == 'Y':
             file_name = 'icwb2-data.zip'
             urllib.request.urlretrieve('http://sighan.cs.uchicago.edu/bakeoff2005/data/icwb2-data.zip', 
-                os.path.join(FLAGS.output_dir, file_name))
+                os.path.join(FLAGS.download_dir, file_name))
             
-            zip_ref = zipfile.ZipFile(os.path.join(FLAGS.output_dir, file_name), 'r')
-            zip_ref.extractall(FLAGS.output_dir)
+            zip_ref = zipfile.ZipFile(os.path.join(FLAGS.download_dir, file_name), 'r')
+            zip_ref.extractall(FLAGS.download_dir)
             zip_ref.close()
-
-        path_list = []
-        train_path = os.path.join(FLAGS.output_dir, 'icwb2-data', 'training')
-
-        for dirpath, dirnames, filenames in os.walk(train_path):
-            for filename in filenames:
-                fullpath = os.path.join(dirpath, filename)
-                if 'utf8' in fullpath:
-                    print(fullpath)
-                    path_list.append(fullpath)
-
-        txt_rm_path = os.path.join(FLAGS.output_dir, 'icwb2-data')
-
-        for dirpath, dirnames, filenames in os.walk(txt_rm_path):
-            for filename in filenames:
-                fullpath = os.path.join(dirpath, filename)
-                if 'txt' in fullpath:
-                    os.remove(fullpath)
-
-        return path_list
 
 
     elif data_source == 'wiki-chn':
@@ -199,6 +180,8 @@ def download_extract(data_source, download = 'Y'):
     else:
         assert _is_valid_num_shards(FLAGS.data_source), (
         "Please make sure the data source is either 'pku-msr' or 'wiki-chn'")
+
+
 
 def _create_vocab(path_list):
     """
@@ -280,7 +263,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
         filename = path_list[s]
         #Create file names for shards
         output_filename = "%s-%s" % (name, filename.split('\\')[-1].split('.')[0])
-        output_file = os.path.join(FLAGS.output_dir, output_filename + '.TFRecord')
+        output_file = os.path.join(output_filename + '.TFRecord')
 
         #Init writer
         writer = tf.python_io.TFRecordWriter(output_file)
@@ -367,7 +350,7 @@ def _process_dataset(name, path_list, vocab):
     print("Launching %d threads" % (num_threads))
     for thread_index in range(num_threads):
         args = (thread_index, name, path_list_list[thread_index], vocab, num_shards)
-        t = threading.Thread(target=_process_text_files, args=args)
+        t = Process(target=_process_text_files, args=args)
         t.start()
         threads.append(t)
 
@@ -377,24 +360,35 @@ def _process_dataset(name, path_list, vocab):
         (datetime.now(), len(path_list), name))
 
 
+def get_path(data_dir = '.', suffix = 'utf8', mode = 'train'):
+
+    path_list = []
+    for dirpath, dirnames, filenames in os.walk(data_dir):
+        for filename in filenames:
+            fullpath = os.path.join(dirpath, filename)
+            if fullpath.endswith(suffix) and mode in fullpath:
+                path_list.append(fullpath)
+
+    return path_list
+    
+
 
 def main(unused_argv):
 
     try:
-        os.makedirs(FLAGS.output_dir)
+        os.makedirs(FLAGS.download_dir)
     except (OSError, IOError) as err:
         # Windows may complain if the folders already exist
         pass
 
-    path_list = download_extract(FLAGS.data_source, 'N')
+    download_extract(FLAGS.data_source, 'N')
 
-    vocab = _create_vocab(path_list)
-    pickle.dump(vocab, open('vocab.pkl', 'wb'))
+    path_list = get_path(data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data', 'training'))
 
     trimmed_path_list = []
     for filename in path_list:
         output_filename = "%s-%s" % ('train', filename.split('\\')[-1].split('.')[0])
-        output_file = os.path.join(FLAGS.output_dir, output_filename + '.TFRecord')
+        output_file = os.path.join(output_filename + '.TFRecord')
         if os.path.isfile(output_file):
             pass
         else:
@@ -402,8 +396,20 @@ def main(unused_argv):
 
     path_list = trimmed_path_list
 
-    #_process_dataset('train', path_list, vocab)
+    _process_dataset('train', path_list, vocab)
 
+    trimmed_path_list = []
+    for filename in path_list:
+        output_filename = "%s-%s" % ('test', filename.split('\\')[-1].split('.')[0])
+        output_file = os.path.join(output_filename + '.TFRecord')
+        if os.path.isfile(output_file):
+            pass
+        else:
+            trimmed_path_list.append(filename)
+
+    path_list = trimmed_path_list
+
+    _process_dataset('test', path_list, vocab)
 
 if __name__ == '__main__':
     tf.app.run()

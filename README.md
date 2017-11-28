@@ -67,6 +67,10 @@ python inference.py \
     --out_dir=${INF_OUTPUT}
 ```
 
+## 如何根据自己需要修改算法
+
+本模型使用的是单向LSTM+CRF，但是提供了算法修改的可能性。在```lstm_based_cws_model.py```文件中的
+
 
 
 

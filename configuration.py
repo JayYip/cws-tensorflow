@@ -48,16 +48,16 @@ class TrainingConfig(object):
         self.num_examples_per_epoch = 5120
 
         #Optimizer for training
-        self.optimizer = 'Adam'
+        self.optimizer = 'SGD'
 
         #Learning rate
-        self.initial_learning_rate = 2.0
+        self.initial_learning_rate = 1.0
         #If decay factor <= 0 then not decay
         self.learning_rate_decay_factor = 0.5
         self.num_epochs_per_decay = 5.0
 
         #Gradient clipping
-        self.clip_gradients = 5.0
+        self.clip_gradients = 3.0
 
         #Max checkpoints to keep
         self.max_checkpoints_to_keep = 5

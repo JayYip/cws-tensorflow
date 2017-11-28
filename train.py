@@ -104,7 +104,7 @@ def main(unused_argv):
     tf.contrib.slim.learning.train(
         train_op,
         train_dir,
-        log_every_n_steps=1,
+        log_every_n_steps=FLAGS.log_every_n_steps,
         graph=g,
         global_step=model.global_step,
         number_of_steps=train_config.training_step,

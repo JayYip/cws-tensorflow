@@ -104,3 +104,4 @@ output/
 #ini file
 *.ini
 
+*.TFRecord
