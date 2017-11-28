@@ -25,7 +25,9 @@ python build_pku_msr_input.py \
 
 ### 2. 字符嵌入
 
-从[Polygot](https://sites.google.com/site/rmyeid/projects/polyglot)下载中文字嵌入数据集至项目目录，运行项目目录下process_chr_embedding.py。
+#### 2.1 预训练好的字嵌入
+1. 将`configuration.py`中的`ModelConfig`的`self.random_embedding`设置为`False`
+2. 从[Polygot](https://sites.google.com/site/rmyeid/projects/polyglot)下载中文字嵌入数据集至项目目录，运行项目目录下`process_chr_embedding.py`。
 
 ```
 EMBEDDING_DIR=...
@@ -35,6 +37,10 @@ python process_chr_embedding.py \
     --chr_embedding_dir=${EMBEDDING_DIR}
     --vocab_dir=${VOCAB_DIR}
 ```
+
+#### 2.2 随机初始化字嵌入
+
+将`configuration.py`中的`ModelConfig`的`self.random_embedding`设置为`True`
 
 ### 3. 训练模型
 
