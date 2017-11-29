@@ -90,17 +90,18 @@ class Vocabulary(object):
       return self._id_vocab[word_id]
 
 def tag_to_id(t):
-    if t == 's':
-        return 0
 
-    elif t == 'b':
+    if t == 's':
         return 1
 
-    elif t == 'm':
+    elif t == 'b':
         return 2
 
-    elif t == 'e':
+    elif t == 'm':
         return 3
+
+    elif t == 'e':
+        return 4
 
 #Line processing functions
 

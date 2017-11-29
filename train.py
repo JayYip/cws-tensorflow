@@ -27,6 +27,7 @@ tf.flags.DEFINE_string("train_dir", "save_model",
                        "Directory for saving and loading model checkpoints.")
 tf.flags.DEFINE_integer("log_every_n_steps", 100,
                         "Frequency at which loss and global step are logged.")
+tf.flags.DEFINE_string("log_dir", "log", "Path of summary")
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -70,6 +71,10 @@ def main(unused_argv):
         print('Building model...')
         model.build()
 
+        # merged = tf.summary.merge_all()
+        # train_writer = tf.summary.FileWriter(FLAGS.logdir + '/train',
+        #                                     g)
+
         #Set up learning rate and learning rate decay function
         learning_rate_decay_fn = None
         learning_rate = tf.constant(train_config.initial_learning_rate)
@@ -112,7 +117,8 @@ def main(unused_argv):
         graph=g,
         global_step=model.global_step,
         number_of_steps=train_config.training_step,
-        saver=saver)
+        saver=saver,
+        save_summaries_secs=5)
 
 
 if __name__ == '__main__':

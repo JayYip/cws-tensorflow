@@ -25,14 +25,14 @@ class ModelConfig(object):
         self.num_preprocess_thread = 2
 
         #Batch size
-        self.batch_size = 512
+        self.batch_size = 32
 
         #LSTM input and output dimensions
-        self.embedding_size = 64
-        self.num_lstm_units = 64
+        self.embedding_size = 100
+        self.num_lstm_units = 128
 
         #Fully connected layer output dimensions
-        self.num_tag = 4
+        self.num_tag = 5
 
         #Dropout
         self.lstm_dropout_keep_prob = 0.7
@@ -41,32 +41,32 @@ class ModelConfig(object):
         #Regularization
         self.regularization = 0.0001
 
-        self.seq_max_len = 30
+        self.seq_max_len = 35
         
 
 class TrainingConfig(object):
     """docstring for TrainingConfig"""
     def __init__(self):
         
-        self.num_examples_per_epoch = 512000
+        self.num_examples_per_epoch = 500000
 
         #Optimizer for training
         self.optimizer = 'Adam'
 
         #Learning rate
-        self.initial_learning_rate = 0.005
+        self.initial_learning_rate = 0.001
         #If decay factor <= 0 then not decay
         self.learning_rate_decay_factor = 0.5
         self.num_epochs_per_decay = 2
 
         #Gradient clipping
-        self.clip_gradients = 3.0
+        self.clip_gradients = 1.0
 
         #Max checkpoints to keep
-        self.max_checkpoints_to_keep = 5
+        self.max_checkpoints_to_keep = 2
 
         #Set training step
-        self.training_step = 1000
+        self.training_step = 1000000
 
         self.embedding_random = True
 

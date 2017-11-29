@@ -27,7 +27,7 @@ class LSTMCWS(object):
 
         Args:
             Config: configuration object
-            mode: 'train', 'eval' or 'inference'
+            mode: 'train', 'test' or 'inference'
         """
 
         self.config = config
@@ -49,6 +49,9 @@ class LSTMCWS(object):
     def is_training(self):
         return self.mode == 'train'
 
+    def is_test(self):
+        return self.mode == 'test'
+
     def build_inputs(self):
         """
         Input prefetching, preprocessing and batching for trianing
@@ -62,47 +65,50 @@ class LSTMCWS(object):
             self.tag_output_seq: A tensor of input sequence to tag inference model with the shape of [batch_size, padding_size -1]
         """
 
-        if self.is_training():
-            #Get all TFRecord path into a list
-            data_files = []
-            file_pattern = '*.TFRecord'
-            data_files.extend(tf.gfile.Glob(file_pattern))
+        if self.is_training() or self.is_test():
 
-            data_files = [x for x in data_files if os.path.split(x)[-1].startswith(self.mode)]
+            with tf.variable_scope('train_eval_input'):
+                #Get all TFRecord path into a list
+                data_files = []
+                file_pattern = '*.TFRecord'
+                data_files.extend(tf.gfile.Glob(file_pattern))
 
-            if not data_files:
-                tf.logging.fatal("Found no input files matching %s", file_pattern)
-            else:
-                tf.logging.info("Prefetching values from %d files matching %s",
-                            len(data_files), file_pattern)
+                data_files = [x for x in data_files if os.path.split(x)[-1].startswith(self.mode)]
 
-            def _parse_wrapper(l):
-                return input_ops.parse_example_queue(l, self.config)
+                if not data_files:
+                    tf.logging.fatal("Found no input files matching %s", file_pattern)
+                else:
+                    tf.logging.info("Prefetching values from %d files matching %s",
+                                len(data_files), file_pattern)
 
-            dataset = tf.data.TFRecordDataset(data_files).map(_parse_wrapper).repeat(10000)
-            if self.is_training():
-                dataset = dataset.shuffle(buffer_size=256)
+                def _parse_wrapper(l):
+                    return input_ops.parse_example_queue(l, self.config)
 
-            dataset = dataset.padded_batch(batch_size=self.config.batch_size, 
-                                        padded_shapes = (tf.TensorShape([self.config.seq_max_len]), 
-                                                            tf.TensorShape([self.config.seq_max_len]),
-                                                            tf.TensorShape([]))).filter(
-                                                                lambda x, y, z: tf.equal(tf.shape(x)[0], self.config.batch_size) )
+                dataset = tf.data.TFRecordDataset(data_files).map(_parse_wrapper)
+                if self.is_training():
+                    dataset = dataset.shuffle(buffer_size=256).repeat(10000)
+
+                dataset = dataset.padded_batch(batch_size=self.config.batch_size, 
+                                            padded_shapes = (tf.TensorShape([self.config.seq_max_len]), 
+                                                                tf.TensorShape([self.config.seq_max_len]),
+                                                                tf.TensorShape([]))).filter(
+                                                                    lambda x, y, z: tf.equal(tf.shape(x)[0], self.config.batch_size) )
 
 
 
-            iterator = dataset.make_one_shot_iterator()
+                iterator = dataset.make_one_shot_iterator()
 
-            input_seqs, tag_seqs, sequence_length  = iterator.get_next()
+                input_seqs, tag_seqs, sequence_length  = iterator.get_next()
 
         else:
-            #Inference
-            input_seq_feed = tf.get_default_graph().get_tensor_by_name("input_seq_feed:0")
-            input_seqs = tf.expand_dims(input_seq_feed, 0)
-            input_mask = tf.ones(tf.shape(input_seqs), dtype=tf.int32)
-            sequence_length = tf.add(tf.reduce_sum(input_mask, 1), 1)
+            with tf.variable_scope('inf_input'):
+                #Inference
+                input_seq_feed = tf.get_default_graph().get_tensor_by_name("input_seq_feed:0")
+                input_seqs = tf.expand_dims(input_seq_feed, 0)
+                input_mask = tf.ones(tf.shape(input_seqs), dtype=tf.int32)
+                sequence_length = tf.add(tf.reduce_sum(input_mask, 1), 1)
 
-            tag_seqs = None
+                tag_seqs = None
 
         
         self.input_seqs = input_seqs
@@ -146,36 +152,36 @@ class LSTMCWS(object):
         """
 
         #Setup LSTM Cell
-        lstm_cell = tf.contrib.rnn.BasicLSTMCell(
+        fw_lstm_cell = tf.contrib.rnn.BasicLSTMCell(
+            num_units = self.config.num_lstm_units, state_is_tuple = True)
+        bw_lstm_cell = tf.contrib.rnn.BasicLSTMCell(
             num_units = self.config.num_lstm_units, state_is_tuple = True)
 
         #Dropout when training
         if self.is_training():
-            lstm_cell = tf.contrib.rnn.DropoutWrapper(
-                lstm_cell,
+            fw_lstm_cell = tf.contrib.rnn.DropoutWrapper(
+                fw_lstm_cell,
+                input_keep_prob = self.config.lstm_dropout_keep_prob,
+                output_keep_prob = self.config.lstm_dropout_keep_prob)
+            bw_lstm_cell = tf.contrib.rnn.DropoutWrapper(
+                fw_lstm_cell,
                 input_keep_prob = self.config.lstm_dropout_keep_prob,
                 output_keep_prob = self.config.lstm_dropout_keep_prob)
 
         self.seq_embedding.set_shape([None, None, self.config.embedding_size])
 
         with tf.variable_scope('seq_lstm') as lstm_scope:
-            #Init lstm
-            #Get the initial state for dynamic_rnn
-            if self.is_training():
-                init_state = lstm_cell.zero_state(batch_size = self.config.batch_size, dtype = tf.float32)
-            else:
-                init_state = lstm_cell.zero_state(batch_size = 1, dtype = tf.float32)
-                self.seq_embedding = tf.cast(self.seq_embedding, tf.float32)
-
 
             #Run LSTM with sequence_length timesteps
-            lstm_output, _ = tf.nn.dynamic_rnn(cell = lstm_cell,
+            bi_output, _ = tf.nn.bidirectional_dynamic_rnn(
+                cell_fw = fw_lstm_cell,
+                cell_bw = bw_lstm_cell,
                 inputs = self.seq_embedding,
                 sequence_length = self.sequence_length,
-                initial_state = init_state,
                 dtype = tf.float32,
                 scope = lstm_scope)
-
+            fw_out, bw_out = bi_output
+            lstm_output = tf.concat([fw_out, bw_out], 2)
 
         self.lstm_output = lstm_output
 
@@ -192,11 +198,11 @@ class LSTMCWS(object):
                 scope = logit_scope)
 
 
-        if not self.is_training():
-            # In inference, logit will be returned since the decode fn only takes numpy array.
-            logit = tf.squeeze(logit)
-
-            self.logit = logit
+        if not self.is_training() and not self.is_test():
+            with tf.variable_scope('tag_inf', reuse = True):
+                transition_param = tf.get_variable('transition_param')
+                self.predict_tag, _ = tf.contrib.crf.crf_decode(
+                    logit, transition_param, self.sequence_length)
 
         else:
             with tf.variable_scope('tag_inf') as tag_scope:
@@ -207,16 +213,34 @@ class LSTMCWS(object):
                 self.predict_tag, _ = tf.contrib.crf.crf_decode(
                     logit, transition_param, self.sequence_length)
 
-            batch_loss = tf.reduce_sum(-sentence_likelihood)
+            with tf.variable_scope('loss'):
+                batch_loss = tf.reduce_mean(-sentence_likelihood) / tf.cast(tf.reduce_mean(self.sequence_length), dtype = tf.float32)
 
-            #Add to total loss
-            tf.losses.add_loss(batch_loss)
+                #Add to total loss
+                tf.losses.add_loss(batch_loss)
 
-            #Get total loss
-            total_loss = tf.losses.get_total_loss()
+                #Get total loss
+                total_loss = tf.losses.get_total_loss()
 
-            tf.summary.scalar('losses/batch_loss', batch_loss)
-            tf.summary.scalar('losses/total_loss', total_loss)
+                tf.summary.scalar('batch_loss', batch_loss)
+                tf.summary.scalar('total_loss', total_loss)
+
+            with tf.variable_scope('accuracy'):
+                # Calculate acc
+                # get mask
+                zero = tf.constant(0, dtype=tf.int32)
+                mask = tf.cast(tf.not_equal(tf.cast(self.tag_seqs, tf.int32), zero), tf.float32)
+
+                correct = tf.equal(self.predict_tag, tf.cast(self.tag_seqs, tf.int32))
+                correct = tf.cast(correct, tf.float32)
+                correct = tf.multiply(correct, mask)
+
+                self.accuracy = tf.reduce_mean(correct)
+
+                if self.is_test():
+                    tf.summary.scalar('eval_accuracy', self.accuracy)
+                else:
+                    tf.summary.scalar('train_op/train_accuracy', self.accuracy)
 
             #Output loss
             self.batch_loss = batch_loss

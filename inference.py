@@ -85,24 +85,19 @@ def append_to_file(output_buffer, filename):
 
 def tag_to_id(t):
     if t == 's':
-        return 0
-
-    elif t == 'b':
         return 1
 
-    elif t == 'm':
+    elif t == 'b':
         return 2
 
-    elif t == 'e':
+    elif t == 'm':
         return 3
+
+    elif t == 'e':
+        return 4
 
 def seq_acc(seq1, seq2):
     correct = 0
-    if len(seq1) != len(seq2):
-        print('Not equal seq length')
-        print(seq1)
-        print(seq2)
-        raise ValueError
 
     for seq_ind, char in enumerate(seq1):
         if char == seq2[seq_ind]:
