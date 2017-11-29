@@ -164,7 +164,7 @@ class LSTMCWS(object):
                 input_keep_prob = self.config.lstm_dropout_keep_prob,
                 output_keep_prob = self.config.lstm_dropout_keep_prob)
             bw_lstm_cell = tf.contrib.rnn.DropoutWrapper(
-                fw_lstm_cell,
+                bw_lstm_cell,
                 input_keep_prob = self.config.lstm_dropout_keep_prob,
                 output_keep_prob = self.config.lstm_dropout_keep_prob)
 
@@ -199,8 +199,8 @@ class LSTMCWS(object):
 
 
         if not self.is_training() and not self.is_test():
-            with tf.variable_scope('tag_inf', reuse = True):
-                transition_param = tf.get_variable('transition_param')
+            with tf.variable_scope('tag_inf'):
+                transition_param = tf.get_variable('transition_param', shape=[self.config.num_tag, self.config.num_tag])
                 self.predict_tag, _ = tf.contrib.crf.crf_decode(
                     logit, transition_param, self.sequence_length)
 
@@ -240,7 +240,7 @@ class LSTMCWS(object):
                 if self.is_test():
                     tf.summary.scalar('eval_accuracy', self.accuracy)
                 else:
-                    tf.summary.scalar('train_op/train_accuracy', self.accuracy)
+                    tf.summary.scalar('train_accuracy', self.accuracy)
 
             #Output loss
             self.batch_loss = batch_loss
