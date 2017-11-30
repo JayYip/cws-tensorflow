@@ -63,7 +63,7 @@ def _create_restore_fn(checkpoint_path, saver):
     return _restore_fn
 
 def insert_space(char, tag):
-    if tag == 0 or tag == 3:
+    if tag == 1 or tag == 4:
         return char + ' '
     else:
         return char

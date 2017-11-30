@@ -64,7 +64,7 @@ def main(unused_argv):
                 shape = (shape[0], shape[1]), trainable=True, initializer=tf.initializers.orthogonal(-0.1, 0.1))
             if not train_config.embedding_random:
                 embedding = tf.convert_to_tensor(chr_embedding, dtype = tf.float32)
-                embedding_assign_op = chr_embedding_var.assign(embedding)
+                embedding_assign_op = chr_embedding_var.assign(chr_embedding)
 
         #Build model
         model = LSTMCWS(model_config, 'train')

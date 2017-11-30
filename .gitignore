@@ -106,3 +106,4 @@ output/
 
 *.TFRecord
 data/
+ckpt/
