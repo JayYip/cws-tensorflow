@@ -143,12 +143,8 @@ def main(unused_argv):
     with g.as_default():
 
         input_seq_feed = tf.placeholder(name = 'input_seq_feed', dtype = tf.int64)
+        seq_length = tf.placeholder(name = 'seq_length', dtype = tf.int64)
 
-        #Add transition var to graph
-        with tf.variable_scope('tag_inf') as scope:
-            transition_param = tf.Variable(name = 'transitions', 
-                initial_value = 0,
-                validate_shape=False)
 
         #Build model
         model = LSTMCWS(model_config, 'inference')
@@ -190,25 +186,29 @@ def main(unused_argv):
                     input_label = [tag_to_id(x) for x in str_input_label]
 
 
-                    #get input sequence
+                    #get input sequence, seq length
                     input_seqs_list = [x for x in input_seqs_list if x != 1]
+                    seq_len = min(len(input_seqs_list), model_config.seq_max_len)
+                    # pad to same shape
+                    for _ in range(model_config.seq_max_len):
+                        input_seqs_list.append(0)
+                    input_seqs_list = input_seqs_list[:model_config.seq_max_len]
+                    
+                    #get seqence length
+                    input_label = input_label[:model_config.seq_max_len]
 
-
-                    if len(input_seqs_list) <= 1:
+                    if seq_len <= 1:
                         predict_tag = [0]
                         output_buffer.append(get_final_output(l, predict_tag))
 
                     else:
                         predict_tag = sess.run(model.predict_tag, 
-                            feed_dict = {input_seq_feed:input_seqs_list})
+                            feed_dict = {input_seq_feed:input_seqs_list, seq_length: seq_len})
+                        
+                        predict_tag = predict_tag[0][:seq_len]
 
-                        if len(predict_tag) != len(input_seqs_list):
+                        if len(predict_tag) != len(input_label):
                             print('predict not right')
-                            print(l)
-                        if len(input_seqs_list) != len(input_label):
-                            print('label not right')
-                            print(l)
-                            print(str_input_label)
 
                         output_buffer.append(get_final_output(l, predict_tag))
 

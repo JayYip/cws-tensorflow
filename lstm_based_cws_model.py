@@ -100,13 +100,13 @@ class LSTMCWS(object):
 
                 input_seqs, tag_seqs, sequence_length  = iterator.get_next()
 
-        else:
+        else:       
             with tf.variable_scope('inf_input'):
                 #Inference
                 input_seq_feed = tf.get_default_graph().get_tensor_by_name("input_seq_feed:0")
+                sequence_length = tf.get_default_graph().get_tensor_by_name("seq_length:0")
                 input_seqs = tf.expand_dims(input_seq_feed, 0)
-                input_mask = tf.ones(tf.shape(input_seqs), dtype=tf.int32)
-                sequence_length = tf.add(tf.reduce_sum(input_mask, 1), 1)
+                sequence_length = tf.expand_dims(sequence_length, 0)
 
                 tag_seqs = None
 
@@ -114,6 +114,7 @@ class LSTMCWS(object):
         self.input_seqs = input_seqs
         self.tag_seqs = tag_seqs
         self.sequence_length = sequence_length
+
 
 
     def build_chr_embedding(self):
@@ -197,12 +198,13 @@ class LSTMCWS(object):
                 weights_initializer = self.initializer,
                 scope = logit_scope)
 
-
+        
         if not self.is_training() and not self.is_test():
-            with tf.variable_scope('tag_inf'):
-                transition_param = tf.get_variable('transition_param', shape=[self.config.num_tag, self.config.num_tag])
-                self.predict_tag, _ = tf.contrib.crf.crf_decode(
-                    logit, transition_param, self.sequence_length)
+            with tf.variable_scope('tag_inf') as tag_scope:
+                transition_param = tf.get_variable('transitions', shape = [self.config.num_tag, self.config.num_tag])
+
+            self.predict_tag, _ = tf.contrib.crf.crf_decode(
+                logit, transition_param, self.sequence_length)
 
         else:
             with tf.variable_scope('tag_inf') as tag_scope:
@@ -210,8 +212,8 @@ class LSTMCWS(object):
                     tag_indices = tf.to_int32(self.tag_seqs),
                     sequence_lengths = self.sequence_length)
 
-                self.predict_tag, _ = tf.contrib.crf.crf_decode(
-                    logit, transition_param, self.sequence_length)
+            self.predict_tag, _ = tf.contrib.crf.crf_decode(
+                logit, transition_param, self.sequence_length)
 
             with tf.variable_scope('loss'):
                 batch_loss = tf.reduce_mean(-sentence_likelihood) / tf.cast(tf.reduce_mean(self.sequence_length), dtype = tf.float32)
