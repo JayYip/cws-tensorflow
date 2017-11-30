@@ -97,7 +97,7 @@ def main(unused_argv):
         print('Setting up training ops...')
         #Set up training op
         train_op = tf.contrib.layers.optimize_loss(
-            loss = model.total_loss,
+            loss = model.batch_loss,
             global_step = model.global_step,
             learning_rate = learning_rate,
             optimizer = train_config.optimizer,

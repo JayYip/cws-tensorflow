@@ -52,6 +52,9 @@ class LSTMCWS(object):
     def is_test(self):
         return self.mode == 'test'
 
+    def is_inf(self):
+        return self.mode == 'inference'
+
     def build_inputs(self):
         """
         Input prefetching, preprocessing and batching for trianing
@@ -65,7 +68,7 @@ class LSTMCWS(object):
             self.tag_output_seq: A tensor of input sequence to tag inference model with the shape of [batch_size, padding_size -1]
         """
 
-        if self.is_training() or self.is_test():
+        if not self.is_inf():
 
             with tf.variable_scope('train_eval_input'):
                 #Get all TFRecord path into a list
@@ -86,7 +89,7 @@ class LSTMCWS(object):
 
                 dataset = tf.data.TFRecordDataset(data_files).map(_parse_wrapper)
                 if self.is_training():
-                    dataset = dataset.shuffle(buffer_size=256).repeat(10000)
+                    dataset = dataset.shuffle(buffer_size=256).repeat(10000).shuffle(buffer_size=256)
 
                 dataset = dataset.padded_batch(batch_size=self.config.batch_size, 
                                             padded_shapes = (tf.TensorShape([self.config.seq_max_len]), 
@@ -197,9 +200,10 @@ class LSTMCWS(object):
                 activation_fn = None,
                 weights_initializer = self.initializer,
                 scope = logit_scope)
+            self.logit = logit
 
         
-        if not self.is_training() and not self.is_test():
+        if self.is_inf():
             with tf.variable_scope('tag_inf') as tag_scope:
                 transition_param = tf.get_variable('transitions', shape = [self.config.num_tag, self.config.num_tag])
 
@@ -215,8 +219,22 @@ class LSTMCWS(object):
             self.predict_tag, _ = tf.contrib.crf.crf_decode(
                 logit, transition_param, self.sequence_length)
 
+
             with tf.variable_scope('loss'):
                 batch_loss = tf.reduce_mean(-sentence_likelihood) / tf.cast(tf.reduce_mean(self.sequence_length), dtype = tf.float32)
+
+
+        # if self.is_inf():
+        #     prob = tf.nn.softmax(logit)
+        #     self.predict_tag = tf.squeeze(tf.nn.top_k(prob, k=1)[1])
+
+        # else:
+        #     with tf.variable_scope('loss'):
+        #         prob = tf.nn.softmax(logit)
+        #         self.predict_tag = tf.squeeze(tf.nn.top_k(prob, k=1)[1])
+                
+        #         batch_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logit, labels=self.tag_seqs)
+        #         batch_loss = tf.reduce_mean(batch_loss)
 
                 #Add to total loss
                 tf.losses.add_loss(batch_loss)
@@ -228,20 +246,21 @@ class LSTMCWS(object):
                 tf.summary.scalar('total_loss', total_loss)
 
             with tf.variable_scope('accuracy'):
+
+                seq_len = tf.cast(tf.reduce_sum(self.sequence_length), tf.float32)
+                padded_len = tf.cast(tf.reduce_sum(self.config.batch_size * self.config.seq_max_len), tf.float32)
+
                 # Calculate acc
-                # get mask
-                zero = tf.constant(0, dtype=tf.int32)
-                mask = tf.cast(tf.not_equal(tf.cast(self.tag_seqs, tf.int32), zero), tf.float32)
+                correct = tf.cast(tf.equal(self.predict_tag, tf.cast(self.tag_seqs, tf.int32)), tf.float32)
+                correct = tf.reduce_sum(correct) - padded_len + seq_len
 
-                correct = tf.equal(self.predict_tag, tf.cast(self.tag_seqs, tf.int32))
-                correct = tf.cast(correct, tf.float32)
-                correct = tf.multiply(correct, mask)
-
-                self.accuracy = tf.reduce_mean(correct)
+                self.accuracy = correct / seq_len
 
                 if self.is_test():
+
                     tf.summary.scalar('eval_accuracy', self.accuracy)
                 else:
+                    tf.summary.scalar('average_len', tf.reduce_mean(self.sequence_length))
                     tf.summary.scalar('train_accuracy', self.accuracy)
 
             #Output loss

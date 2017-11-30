@@ -28,20 +28,20 @@ class ModelConfig(object):
         self.batch_size = 32
 
         #LSTM input and output dimensions
-        self.embedding_size = 100
-        self.num_lstm_units = 128
+        self.embedding_size = 64
+        self.num_lstm_units = 64
 
         #Fully connected layer output dimensions
         self.num_tag = 5
 
         #Dropout
-        self.lstm_dropout_keep_prob = 0.7
+        self.lstm_dropout_keep_prob = 0.35
         #Margin loss discount
         self.margin_loss_discount = 0.2
         #Regularization
         self.regularization = 0.0001
 
-        self.seq_max_len = 35
+        self.seq_max_len = 60
         
 
 class TrainingConfig(object):
@@ -54,7 +54,7 @@ class TrainingConfig(object):
         self.optimizer = 'Adam'
 
         #Learning rate
-        self.initial_learning_rate = 0.001
+        self.initial_learning_rate = 0.01
         #If decay factor <= 0 then not decay
         self.learning_rate_decay_factor = 0.5
         self.num_epochs_per_decay = 2
@@ -66,8 +66,8 @@ class TrainingConfig(object):
         self.max_checkpoints_to_keep = 2
 
         #Set training step
-        self.training_step = 1000000
+        self.training_step = 100000
 
-        self.embedding_random = True
+        self.embedding_random = False
 
 
