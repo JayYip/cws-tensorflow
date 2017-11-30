@@ -77,13 +77,5 @@ python inference.py \
 
 本模型使用的是单向LSTM+CRF，但是提供了算法修改的可能性。在```lstm_based_cws_model.py```文件中的
 
-## TODO
-
-1. ~~Change input to tf.data~~
-2. ~~Add random init support~~
-3. ~~complete test and accuracy calculation~~
-4. Add Tensorboard support
-5. Change to bi-lstm
-
 
 
