@@ -2,7 +2,6 @@
 
 #Author: Jay Yip
 #Date 20Feb2017
-
 """
 Download the PKU-MSR datasets or Chinese Wiki dataset and convert
 it to TFRecords.
@@ -44,50 +43,50 @@ from multiprocessing import Process
 
 import tensorflow as tf
 
-
 tf.flags.DEFINE_string("data_source", "pku-msr",
                        "Specify the data source: pku-msr or wiki-chn")
 tf.flags.DEFINE_string("download_dir", "download_dir", "Output data directory.")
-tf.flags.DEFINE_string("word_counts_output_file", "word_count", "Word Count output dir")
+tf.flags.DEFINE_string("word_counts_output_file", "word_count",
+                       "Word Count output dir")
 tf.flags.DEFINE_integer("train_shards", 128,
                         "Number of shards in training TFRecord files.")
 tf.flags.DEFINE_integer("num_threads", 4,
                         "Number of threads to preprocess the images.")
-tf.flags.DEFINE_integer("window_size", 5,
-                        "The window size of skip-gram model")
+tf.flags.DEFINE_integer("window_size", 5, "The window size of skip-gram model")
 tf.flags.DEFINE_integer("seq_max_len", 30, "Max length of seqence")
 FLAGS = tf.flags.FLAGS
 
 
 class Vocabulary(object):
-  """Simple vocabulary wrapper."""
+    """Simple vocabulary wrapper."""
 
-  def __init__(self, vocab, id_vocab, unk_id, unk_word = '<UNK>'):
-    """Initializes the vocabulary.
+    def __init__(self, vocab, id_vocab, unk_id, unk_word='<UNK>'):
+        """Initializes the vocabulary.
 
     Args:
       vocab: A dictionary of word to word_id.
       unk_id: Id of the special 'unknown' word.
     """
-    self._vocab = vocab
-    self._id_vocab = id_vocab
-    self._unk_id = unk_id
-    self._vocab[unk_word] = len(self._vocab)
-    self._id_vocab[len(self._vocab)] = unk_word
+        self._vocab = vocab
+        self._id_vocab = id_vocab
+        self._unk_id = unk_id
+        self._vocab[unk_word] = len(self._vocab)
+        self._id_vocab[len(self._vocab)] = unk_word
 
-  def word_to_id(self, word):
-    """Returns the integer id of a word string."""
-    if word in self._vocab:
-      return self._vocab[word]
-    else:
-      return self._unk_id
+    def word_to_id(self, word):
+        """Returns the integer id of a word string."""
+        if word in self._vocab:
+            return self._vocab[word]
+        else:
+            return self._unk_id
 
-  def id_to_word(self, word_id):
-    """Returns the word string of an integer word id."""
-    if word_id >= len(self._vocab):
-      return self._id_vocab[self.unk_id]
-    else:
-      return self._id_vocab[word_id]
+    def id_to_word(self, word_id):
+        """Returns the word string of an integer word id."""
+        if word_id >= len(self._vocab):
+            return self._id_vocab[self.unk_id]
+        else:
+            return self._id_vocab[word_id]
+
 
 def tag_to_id(t):
 
@@ -103,24 +102,33 @@ def tag_to_id(t):
     elif t == 'e':
         return 4
 
+
 #Line processing functions
+
 
 def split_list(alist, wanted_parts=1):
     length = len(alist)
-    return [ alist[i*length // wanted_parts: (i+1)*length // wanted_parts] 
-             for i in range(wanted_parts) ]
+    return [
+        alist[i * length // wanted_parts:(i + 1) * length // wanted_parts]
+        for i in range(wanted_parts)
+    ]
+
 
 def process_line_msr_pku(l):
     decoded_line = l.decode('utf8').strip().split('  ')
     return [w.strip('\r\n') for w in decoded_line]
 
+
 def process_line_as_training(l):
-    decoded_line = HanziConv.toSimplified(l.decode('utf8')).strip().split('\u3000')
+    decoded_line = HanziConv.toSimplified(
+        l.decode('utf8')).strip().split('\u3000')
     return [w.strip('\r\n') for w in decoded_line]
+
 
 def process_line_cityu(l):
     decoded_line = HanziConv.toSimplified(l.decode('utf8')).strip().split(' ')
     return [w.strip('\r\n') for w in decoded_line]
+
 
 def get_process_fn(filename):
 
@@ -133,31 +141,34 @@ def get_process_fn(filename):
     elif 'cityu' in filename:
         return process_line_cityu
 
+
 def _is_valid_data_source(data_source):
     return data_source in ['pku-msr', 'wiki-chn']
 
 
 # Convert feature functions
 def _int64_feature(value):
-  """Wrapper for inserting an int64 Feature into a SequenceExample proto."""
-  return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+    """Wrapper for inserting an int64 Feature into a SequenceExample proto."""
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 
 def _bytes_feature(value):
-  """Wrapper for inserting a bytes Feature into a SequenceExample proto."""
-  return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value.encode('utf8')]))
+    """Wrapper for inserting a bytes Feature into a SequenceExample proto."""
+    return tf.train.Feature(bytes_list=tf.train.BytesList(
+        value=[value.encode('utf8')]))
+
 
 def _int64_feature_list(values):
-  """Wrapper for inserting an int64 FeatureList into a SequenceExample proto."""
-  return tf.train.FeatureList(feature=[_int64_feature(v) for v in values])
+    """Wrapper for inserting an int64 FeatureList into a SequenceExample proto."""
+    return tf.train.FeatureList(feature=[_int64_feature(v) for v in values])
 
 
 def _bytes_feature_list(values):
-  """Wrapper for inserting a bytes FeatureList into a SequenceExample proto."""
-  return tf.train.FeatureList(feature=[_bytes_feature(v) for v in values])
+    """Wrapper for inserting a bytes FeatureList into a SequenceExample proto."""
+    return tf.train.FeatureList(feature=[_bytes_feature(v) for v in values])
 
 
-def download_extract(data_source, download = 'Y'):
+def download_extract(data_source, download='Y'):
     """
     Download files from web and extract
     """
@@ -165,13 +176,14 @@ def download_extract(data_source, download = 'Y'):
 
         if download == 'Y':
             file_name = 'icwb2-data.zip'
-            urllib.request.urlretrieve('http://sighan.cs.uchicago.edu/bakeoff2005/data/icwb2-data.zip', 
+            urllib.request.urlretrieve(
+                'http://sighan.cs.uchicago.edu/bakeoff2005/data/icwb2-data.zip',
                 os.path.join(FLAGS.download_dir, file_name))
-            
-            zip_ref = zipfile.ZipFile(os.path.join(FLAGS.download_dir, file_name), 'r')
+
+            zip_ref = zipfile.ZipFile(
+                os.path.join(FLAGS.download_dir, file_name), 'r')
             zip_ref.extractall(FLAGS.download_dir)
             zip_ref.close()
-
 
     elif data_source == 'wiki-chn':
 
@@ -181,8 +193,8 @@ def download_extract(data_source, download = 'Y'):
 
     else:
         assert _is_valid_num_shards(FLAGS.data_source), (
-        "Please make sure the data source is either 'pku-msr' or 'wiki-chn'")
-
+            "Please make sure the data source is either 'pku-msr' or 'wiki-chn'"
+        )
 
 
 def _create_vocab(path_list):
@@ -194,7 +206,7 @@ def _create_vocab(path_list):
     row_count = 0
 
     for file_path in path_list:
-        print("Processing"+file_path)
+        print("Processing" + file_path)
         with open(file_path, 'rb') as f:
             for l in f:
                 counter.update(HanziConv.toSimplified(l.decode('utf8')))
@@ -210,11 +222,11 @@ def _create_vocab(path_list):
     # Write out the word counts file.
     with open(FLAGS.word_counts_output_file, "wb") as f:
 
-      #line = str("\n".join(["%s %d" % (w, c) for w, c in word_counts]))
-      line = ["%s %d" % (w, c) for w, c in word_counts]
-      line = "\n".join(w for w in line).encode('utf8')
+        #line = str("\n".join(["%s %d" % (w, c) for w, c in word_counts]))
+        line = ["%s %d" % (w, c) for w, c in word_counts]
+        line = "\n".join(w for w in line).encode('utf8')
 
-      f.write(line)
+        f.write(line)
     print("Wrote vocabulary file:", FLAGS.word_counts_output_file)
 
     # Create the vocabulary dictionary.
@@ -227,7 +239,6 @@ def _create_vocab(path_list):
     return vocab
 
 
-
 def _to_sequence_example(decoded_str, pos_tag_str, vocab):
 
     #Transfor word to word_id
@@ -237,25 +248,22 @@ def _to_sequence_example(decoded_str, pos_tag_str, vocab):
     tag_id = tag_id[:FLAGS.seq_max_len]
     length = min(FLAGS.seq_max_len, len(content_id))
 
-
     feature_lists = tf.train.FeatureLists(feature_list={
-        "content_id": _int64_feature_list(content_id),
-        "tag_id": _int64_feature_list(tag_id)
-        })
-
-    context = tf.train.Features(feature={
-        "length": _int64_feature(length)
+        "content_id":
+        _int64_feature_list(content_id),
+        "tag_id":
+        _int64_feature_list(tag_id)
     })
 
-    sequence_example = tf.train.SequenceExample(feature_lists=feature_lists, context = context)
+    context = tf.train.Features(feature={"length": _int64_feature(length)})
+
+    sequence_example = tf.train.SequenceExample(
+        feature_lists=feature_lists, context=context)
 
     return sequence_example
 
 
-
-
 def _process_text_files(thread_index, name, path_list, vocab, num_shards):
-
 
     #Create possible tags for fast lookup
     possible_tags = []
@@ -265,24 +273,22 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
         else:
             possible_tags.append('b' + 'm' * (i - 2) + 'e')
 
-
     for s in range(len(path_list)):
         filename = path_list[s]
         #Create file names for shards
-        output_filename = "%s-%s" % (name, filename.split('\\')[-1].split('.')[0])
+        output_filename = "%s-%s" % (name,
+                                     filename.split('\\')[-1].split('.')[0])
         output_file = os.path.join(output_filename + '.TFRecord')
 
         #Init writer
         writer = tf.python_io.TFRecordWriter(output_file)
 
         #Get the input file name
-        
 
         counter = 0
 
-
         #Init left and right queue
-        
+
         sequence_example = None
         with open(filename, 'rb') as f:
 
@@ -297,7 +303,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
                 for w in decoded_line:
                     if w and len(w) <= 29:
                         final_line.append(w)
-                        pos_tag.append(possible_tags[len(w)-1])
+                        pos_tag.append(possible_tags[len(w) - 1])
 
                 decode_str = ''.join(final_line)
 
@@ -307,8 +313,9 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
                     continue
                     print('Skip one row. ' + pos_tag_str + ';' + decode_str)
 
-                if len(decode_str) > 0: 
-                    sequence_example = _to_sequence_example(decode_str, pos_tag_str, vocab)
+                if len(decode_str) > 0:
+                    sequence_example = _to_sequence_example(
+                        decode_str, pos_tag_str, vocab)
                     writer.write(sequence_example.SerializeToString())
                     counter += 1
 
@@ -317,16 +324,11 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
                           (datetime.now(), thread_index, counter))
                     sys.stdout.flush()
 
-
-
         writer.close()
         print("%s [thread %d]: Finished writing to %s" %
               (datetime.now(), thread_index, output_file))
         sys.stdout.flush()
         counter = 0
-
-
-
 
 
 def _process_dataset(name, path_list, vocab):
@@ -337,9 +339,7 @@ def _process_dataset(name, path_list, vocab):
     num_threads = FLAGS.num_threads
     num_shards = len(path_list)
 
-
-
-    #Decide 
+    #Decide
     spacing = np.linspace(0, len(path_list), num_threads + 1).astype(np.int)
     ranges = []
     threads = []
@@ -350,13 +350,14 @@ def _process_dataset(name, path_list, vocab):
     coord = tf.train.Coordinator()
 
     #Assign path_list based on thread to avoid error
-    path_list_list = split_list(path_list, wanted_parts = num_threads)
+    path_list_list = split_list(path_list, wanted_parts=num_threads)
     print(path_list_list)
 
     #Launch thread for batch processing
     print("Launching %d threads" % (num_threads))
     for thread_index in range(num_threads):
-        args = (thread_index, name, path_list_list[thread_index], vocab, num_shards)
+        args = (thread_index, name, path_list_list[thread_index], vocab,
+                num_shards)
         t = Process(target=_process_text_files, args=args)
         t.start()
         threads.append(t)
@@ -364,10 +365,10 @@ def _process_dataset(name, path_list, vocab):
     # Wait for all the threads to terminate.
     coord.join(threads)
     print("%s: Finished processing all %d text files in data set '%s'." %
-        (datetime.now(), len(path_list), name))
+          (datetime.now(), len(path_list), name))
 
 
-def get_path(data_dir = '.', suffix = 'utf8', mode = 'train'):
+def get_path(data_dir='.', suffix='utf8', mode='train'):
 
     path_list = []
     for dirpath, dirnames, filenames in os.walk(data_dir):
@@ -377,7 +378,6 @@ def get_path(data_dir = '.', suffix = 'utf8', mode = 'train'):
                 path_list.append(fullpath)
 
     return path_list
-    
 
 
 def main(unused_argv):
@@ -390,14 +390,16 @@ def main(unused_argv):
 
     download_extract(FLAGS.data_source, 'N')
 
-    path_list = get_path(data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data', 'training'))
+    path_list = get_path(data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data',
+                                               'training'))
 
     vocab = _create_vocab(path_list)
     pickle.dump(vocab, open('vocab.pkl', 'wb'))
 
     trimmed_path_list = []
     for filename in path_list:
-        output_filename = "%s-%s" % ('train', filename.split('\\')[-1].split('.')[0])
+        output_filename = "%s-%s" % ('train',
+                                     filename.split('\\')[-1].split('.')[0])
         output_file = os.path.join(output_filename + '.TFRecord')
         if os.path.isfile(output_file):
             pass
@@ -408,11 +410,14 @@ def main(unused_argv):
 
     _process_dataset('train', path_list, vocab)
 
-    path_list = get_path(data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data', 'gold'), mode = 'test')
+    path_list = get_path(
+        data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data', 'gold'),
+        mode='test')
 
     trimmed_path_list = []
     for filename in path_list:
-        output_filename = "%s-%s" % ('test', filename.split('\\')[-1].split('.')[0])
+        output_filename = "%s-%s" % ('test',
+                                     filename.split('\\')[-1].split('.')[0])
         output_file = os.path.join(output_filename + '.TFRecord')
         if os.path.isfile(output_file):
             pass
@@ -422,6 +427,7 @@ def main(unused_argv):
     path_list = trimmed_path_list
 
     _process_dataset('test', path_list, vocab)
+
 
 if __name__ == '__main__':
     tf.app.run()

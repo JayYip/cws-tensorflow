@@ -2,13 +2,11 @@
 
 #Author: Jay Yip
 #Date 04Mar2017
-
 """Train the model"""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
 
 import tensorflow as tf
 
@@ -18,21 +16,20 @@ from ops.vocab import Vocabulary
 
 import pickle
 
-
 FLAGS = tf.app.flags.FLAGS
 
-tf.flags.DEFINE_string("input_file_dir", "data\output_dir",
+tf.flags.DEFINE_string("input_file_dir", "data\\",
                        "Path of TFRecord input files.")
 tf.flags.DEFINE_string("train_dir", "save_model",
                        "Directory for saving and loading model checkpoints.")
-tf.flags.DEFINE_integer("log_every_n_steps", 100,
+tf.flags.DEFINE_integer("log_every_n_steps", 5000,
                         "Frequency at which loss and global step are logged.")
 tf.flags.DEFINE_string("log_dir", "log", "Path of summary")
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
-def main(unused_argv):
 
+def main(unused_argv):
 
     assert FLAGS.input_file_dir, "--input_file_dir is required"
     assert FLAGS.train_dir, "--train_dir is required"
@@ -50,7 +47,10 @@ def main(unused_argv):
 
     #Load chr emdedding table
     if train_config.embedding_random:
-        shape = [len(pickle.load(open('data/vocab.pkl', 'rb'))._vocab), model_config.embedding_size]
+        shape = [
+            len(pickle.load(open('data/vocab.pkl', 'rb'))._vocab),
+            model_config.embedding_size
+        ]
     else:
         chr_embedding = pickle.load(open('chr_embedding.pkl', 'rb'))
         shape = chr_embedding.shape
@@ -60,10 +60,14 @@ def main(unused_argv):
     with g.as_default():
         #Set embedding table
         with tf.variable_scope('seq_embedding') as seq_embedding_scope:
-            chr_embedding_var = tf.get_variable(name = 'chr_embedding', 
-                shape = (shape[0], shape[1]), trainable=True, initializer=tf.initializers.orthogonal(-0.1, 0.1))
+            chr_embedding_var = tf.get_variable(
+                name='chr_embedding',
+                shape=(shape[0], shape[1]),
+                trainable=True,
+                initializer=tf.initializers.orthogonal(-0.1, 0.1))
             if not train_config.embedding_random:
-                embedding = tf.convert_to_tensor(chr_embedding, dtype = tf.float32)
+                embedding = tf.convert_to_tensor(
+                    chr_embedding, dtype=tf.float32)
                 embedding_assign_op = chr_embedding_var.assign(chr_embedding)
 
         #Build model
@@ -79,10 +83,10 @@ def main(unused_argv):
         learning_rate_decay_fn = None
         learning_rate = tf.constant(train_config.initial_learning_rate)
         if train_config.learning_rate_decay_factor > 0:
-            num_batches_per_epoch = (train_config.num_examples_per_epoch /
-                                     model_config.batch_size)
-            decay_steps = int(num_batches_per_epoch *
-                              train_config.num_epochs_per_decay)
+            num_batches_per_epoch = (
+                train_config.num_examples_per_epoch / model_config.batch_size)
+            decay_steps = int(
+                num_batches_per_epoch * train_config.num_epochs_per_decay)
 
             def _learning_rate_decay_fn(learning_rate, global_step):
                 return tf.train.exponential_decay(
@@ -97,16 +101,22 @@ def main(unused_argv):
         print('Setting up training ops...')
         #Set up training op
         train_op = tf.contrib.layers.optimize_loss(
-            loss = model.batch_loss,
-            global_step = model.global_step,
-            learning_rate = learning_rate,
-            optimizer = train_config.optimizer,
-            clip_gradients = train_config.clip_gradients,
-            learning_rate_decay_fn = learning_rate_decay_fn,
-            name = 'train_op')
+            loss=model.batch_loss,
+            global_step=model.global_step,
+            learning_rate=learning_rate,
+            optimizer=train_config.optimizer,
+            clip_gradients=train_config.clip_gradients,
+            learning_rate_decay_fn=learning_rate_decay_fn,
+            name='train_op')
 
         #Set up saver
-        saver = tf.train.Saver(max_to_keep = train_config.max_checkpoints_to_keep)
+        saver = tf.train.Saver(max_to_keep=train_config.max_checkpoints_to_keep)
+
+    gpu_options = tf.GPUOptions(
+        visible_device_list=",".join(map(str, [0])),
+        per_process_gpu_memory_fraction=0.33)
+
+    sess_config = tf.ConfigProto(gpu_options=gpu_options)
 
     print('Start Training...')
     # Run training.
@@ -118,7 +128,8 @@ def main(unused_argv):
         global_step=model.global_step,
         number_of_steps=train_config.training_step,
         saver=saver,
-        save_summaries_secs=5)
+        save_summaries_secs=30,
+        session_config=sess_config)
 
 
 if __name__ == '__main__':

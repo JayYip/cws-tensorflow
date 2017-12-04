@@ -2,20 +2,19 @@
 
 #Author: Jay Yip
 #Date 04Mar2017
-
 """Batching, padding and masking the input sequence and output sequence"""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import tensorflow as tf
 
 from hanziconv.hanziconv import HanziConv
 
+
 def parse_example_queue(example_queue, config):
-      """ Read one example.
+    """ Read one example.
       This function read one example and return context sequence and tag sequence
       correspondingly. 
 
@@ -29,20 +28,30 @@ def parse_example_queue(example_queue, config):
         tag_seq: An int32 Tensor with different length.
       """
 
-      #Parse one example
-      context, features = tf.parse_single_sequence_example(example_queue, 
+    #Parse one example
+    context, features = tf.parse_single_sequence_example(
+        example_queue,
         context_features={
-                  config.length_name: tf.FixedLenFeature([], dtype=tf.int64)
-              },
-        sequence_features = {
-          config.context_feature_name: tf.FixedLenSequenceFeature([], dtype=tf.int64),
-          config.tag_feature_name: tf.FixedLenSequenceFeature([], dtype = tf.int64)
+            config.length_name: tf.FixedLenFeature([], dtype=tf.int64)
+        },
+        sequence_features={
+            config.context_feature_name:
+            tf.FixedLenSequenceFeature([], dtype=tf.int64),
+            config.tag_feature_name:
+            tf.FixedLenSequenceFeature([], dtype=tf.int64)
         })
 
-      return (features[config.context_feature_name], features[config.tag_feature_name], context[config.length_name])
+    return (features[config.context_feature_name],
+            features[config.tag_feature_name], context[config.length_name])
 
-def example_queue_shuffle(reader, filename_queue, is_training, example_queue_name = 'example_queue', capacity = 50000, num_reader_threads = 1):
-  """
+
+def example_queue_shuffle(reader,
+                          filename_queue,
+                          is_training,
+                          example_queue_name='example_queue',
+                          capacity=50000,
+                          num_reader_threads=1):
+    """
   This function shuffle the examples within the filename queues. Since there's no 
   padding option in shuffle_batch, we have to manually shuffle the example queue.
 
@@ -64,43 +73,50 @@ def example_queue_shuffle(reader, filename_queue, is_training, example_queue_nam
     example_queue: An example queue that is shuffled. Ready for parsing and batching.
   """
 
-  #Init queue
-  if is_training:
-    example_queue = tf.RandomShuffleQueue(
-        capacity=capacity,
-        min_after_dequeue=capacity % 2,
-        dtypes=[tf.string],
-        name="random_" + example_queue_name)
-  else:
-    example_queue = tf.FIFOQueue(
-        capacity=capacity, dtypes=[tf.string], name="fifo_" + example_queue_name)
+    #Init queue
+    if is_training:
+        example_queue = tf.RandomShuffleQueue(
+            capacity=capacity,
+            min_after_dequeue=capacity % 2,
+            dtypes=[tf.string],
+            name="random_" + example_queue_name)
+    else:
+        example_queue = tf.FIFOQueue(
+            capacity=capacity,
+            dtypes=[tf.string],
+            name="fifo_" + example_queue_name)
 
-  #Manually create ops to enqueue
-  enqueue_example_ops = []
-  for _ in range(num_reader_threads):
-    _, example = reader.read(filename_queue)
-    enqueue_example_ops.append(example_queue.enqueue([example]))
+    #Manually create ops to enqueue
+    enqueue_example_ops = []
+    for _ in range(num_reader_threads):
+        _, example = reader.read(filename_queue)
+        enqueue_example_ops.append(example_queue.enqueue([example]))
 
-  #Add queue runner
-  tf.train.queue_runner.add_queue_runner(tf.train.queue_runner.QueueRunner(
-      example_queue, enqueue_example_ops))
-  tf.summary.scalar(
-      "queue/%s/fraction_of_%d_full" % (example_queue.name, capacity),
-      tf.cast(example_queue.size(), tf.float32) * (1. / capacity))
+    #Add queue runner
+    tf.train.queue_runner.add_queue_runner(
+        tf.train.queue_runner.QueueRunner(example_queue, enqueue_example_ops))
+    tf.summary.scalar(
+        "queue/%s/fraction_of_%d_full" % (example_queue.name, capacity),
+        tf.cast(example_queue.size(), tf.float32) * (1. / capacity))
 
-  return example_queue
+    return example_queue
+
 
 def process_line_msr_pku(l):
     decoded_line = l.decode('utf8').strip().split('  ')
     return [w.strip('\r\n') for w in decoded_line]
 
+
 def process_line_as_training(l):
-    decoded_line = HanziConv.toSimplified(l.decode('utf8')).strip().split('\u3000')
+    decoded_line = HanziConv.toSimplified(
+        l.decode('utf8')).strip().split('\u3000')
     return [w.strip('\r\n') for w in decoded_line]
+
 
 def process_line_cityu(l):
     decoded_line = HanziConv.toSimplified(l.decode('utf8')).strip().split(' ')
     return [w.strip('\r\n') for w in decoded_line]
+
 
 def get_process_fn(filename):
 

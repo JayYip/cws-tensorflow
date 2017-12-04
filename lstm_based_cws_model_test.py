@@ -2,8 +2,6 @@
 
 #Author: Jay Yip
 #Date 04Mar2017
-
-
 """Chinese words segmentation model Test"""
 
 from __future__ import absolute_import
@@ -17,6 +15,7 @@ import pickle
 import configuration
 import lstm_based_cws_model
 from ops.vocab import Vocabulary
+
 
 def file_len(fname):
     with open(fname) as f:
@@ -35,7 +34,7 @@ class LSTMCWS(lstm_based_cws_model.LSTMCWS):
                 minval=0,
                 maxval=file_len(os.path.join('data', 'word_count')),
                 dtype=tf.int64,
-                name = 'input_seq_feed:0')
+                name='input_seq_feed:0')
             self.input_mask = tf.ones_like(self.input_seqs)
         else:
             self.input_seqs = tf.random_uniform(
@@ -50,11 +49,12 @@ class LSTMCWS(lstm_based_cws_model.LSTMCWS):
                 dtype=tf.int64)
             self.input_mask = tf.ones_like(self.input_seqs)
 
+
 class LSTMCWSTest(tf.test.TestCase):
 
     def setUp(self):
-      super(LSTMCWSTest, self).setUp()
-      self._model_config = configuration.ModelConfig()
+        super(LSTMCWSTest, self).setUp()
+        self._model_config = configuration.ModelConfig()
 
     def _checkOutputs(self, expected_shapes, feed_dict=None):
         """Verifies that the model produces expected outputs.
@@ -67,17 +67,16 @@ class LSTMCWSTest(tf.test.TestCase):
         fetches = list(expected_shapes.keys())
 
         with self.test_session() as sess:
-          sess.run(tf.global_variables_initializer())
-          outputs = sess.run(fetches, feed_dict)
+            sess.run(tf.global_variables_initializer())
+            outputs = sess.run(fetches, feed_dict)
 
         for index, output in enumerate(outputs):
-          tensor = fetches[index]
-          expected = expected_shapes[tensor]
-          actual = output.shape
-          if expected != actual:
-            self.fail("Tensor %s has shape %s (expected %s)." %
-                      (tensor, actual, expected))
-
+            tensor = fetches[index]
+            expected = expected_shapes[tensor]
+            actual = output.shape
+            if expected != actual:
+                self.fail("Tensor %s has shape %s (expected %s)." %
+                          (tensor, actual, expected))
 
     def testBuildforTraining(self):
         #Load chr emdedding table
@@ -85,15 +84,15 @@ class LSTMCWSTest(tf.test.TestCase):
         shape = chr_embedding.shape
 
         #Set embedding table
-        embedding = tf.convert_to_tensor(chr_embedding, dtype = tf.float32)
+        embedding = tf.convert_to_tensor(chr_embedding, dtype=tf.float32)
         with tf.variable_scope('seq_embedding') as seq_embedding_scope:
-            chr_embedding_var = tf.get_variable(name = 'chr_embedding', shape = (shape[0], shape[1]))
+            chr_embedding_var = tf.get_variable(
+                name='chr_embedding', shape=(shape[0], shape[1]))
             embedding_assign_op = chr_embedding_var.assign(embedding)
 
         #Load chr emdedding table
         model = LSTMCWS(self._model_config, mode="train")
         model.build()
-
 
         expected_shapes = {
             # [batch_size, sequence_length]
@@ -132,6 +131,7 @@ class LSTMCWSTest(tf.test.TestCase):
     #        model.logit: (1, 15, 4)
     #    }
     #    self._checkOutputs(expected_shapes)
+
 
 if __name__ == "__main__":
     tf.test.main()

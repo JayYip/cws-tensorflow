@@ -2,7 +2,6 @@
 
 #Author: Jay Yip
 #Date 05Mar2017
-
 """Download and process the Chinese character embedding table"""
 
 from __future__ import absolute_import
@@ -26,33 +25,32 @@ tf.flags.DEFINE_string("vocab_dir", "data/vocab.pkl",
 
 
 class Vocabulary(object):
-  """Simple vocabulary wrapper."""
+    """Simple vocabulary wrapper."""
 
-  def __init__(self, vocab, unk_id, unk_word = '<UNK>'):
-    """Initializes the vocabulary.
+    def __init__(self, vocab, unk_id, unk_word='<UNK>'):
+        """Initializes the vocabulary.
 
     Args:
       vocab: A dictionary of word to word_id.
       unk_id: Id of the special 'unknown' word.
     """
-    self._vocab = vocab
-    self._unk_id = unk_id
-    self._vocab[unk_word] = 0
+        self._vocab = vocab
+        self._unk_id = unk_id
+        self._vocab[unk_word] = 0
 
-  def word_to_id(self, word):
-    """Returns the integer id of a word string."""
-    if word in self._vocab:
-      return self._vocab[word]
-    else:
-      return self._unk_id
+    def word_to_id(self, word):
+        """Returns the integer id of a word string."""
+        if word in self._vocab:
+            return self._vocab[word]
+        else:
+            return self._unk_id
 
-  def id_to_word(self, word_id):
-    """Returns the word string of an integer word id."""
-    if word_id >= len(self._vocab):
-      return self._vocab[self.unk_id]
-    else:
-      return self._vocab[word_id]
-
+    def id_to_word(self, word_id):
+        """Returns the word string of an integer word id."""
+        if word_id >= len(self._vocab):
+            return self._vocab[self.unk_id]
+        else:
+            return self._vocab[word_id]
 
 
 def download_embedding():
@@ -65,8 +63,10 @@ def download_embedding():
         A tuple (word, embedding). Emebddings shape is (100004, 64).
     """
 
-    assert (tf.gfile.Exists(FLAGS.chr_embedding_dir)), ("Embedding pkl don't found, please \
-        download the Chinese chr embedding from https://sites.google.com/site/rmyeid/projects/polyglot")
+    assert (tf.gfile.Exists(FLAGS.chr_embedding_dir)), (
+        "Embedding pkl don't found, please \
+        download the Chinese chr embedding from https://sites.google.com/site/rmyeid/projects/polyglot"
+    )
 
     with open(FLAGS.chr_embedding_dir, 'rb') as f:
         u = pickle._Unpickler(f)
@@ -74,6 +74,7 @@ def download_embedding():
         p = u.load()
 
     return p
+
 
 def process_embedding(vocab, original_embedding, config):
     """
@@ -94,15 +95,12 @@ def process_embedding(vocab, original_embedding, config):
     word, embedding = original_embedding
 
     for i, w in enumerate(word):
-        embedding_table[vocab.word_to_id(w),:] = embedding[i,:]
+        embedding_table[vocab.word_to_id(w), :] = embedding[i, :]
 
     #Manually set the last row of embedding(unknown chr)
     embedding_table[0, :] = embedding[0, :]
 
     return embedding_table
-
-
-
 
 
 def main(unused_argv):
@@ -122,4 +120,3 @@ def main(unused_argv):
 
 if __name__ == '__main__':
     tf.app.run()
-

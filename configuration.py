@@ -2,7 +2,6 @@
 
 #Author: Jay Yip
 #Date 04Mar2017
-
 """Set the configuration of model and training parameters"""
 
 from __future__ import absolute_import
@@ -12,8 +11,9 @@ from __future__ import print_function
 
 class ModelConfig(object):
     """docstring for ModelConfig"""
+
     def __init__(self):
-        
+
         #Set the feature name of context and tags
         self.context_feature_name = 'content_id'
         self.tag_feature_name = 'tag_id'
@@ -29,7 +29,7 @@ class ModelConfig(object):
 
         #LSTM input and output dimensions
         self.embedding_size = 64
-        self.num_lstm_units = 64
+        self.num_lstm_units = 400
 
         #Fully connected layer output dimensions
         self.num_tag = 5
@@ -42,12 +42,13 @@ class ModelConfig(object):
         self.regularization = 0.0001
 
         self.seq_max_len = 60
-        
+
 
 class TrainingConfig(object):
     """docstring for TrainingConfig"""
+
     def __init__(self):
-        
+
         self.num_examples_per_epoch = 500000
 
         #Optimizer for training
@@ -57,7 +58,7 @@ class TrainingConfig(object):
         self.initial_learning_rate = 0.01
         #If decay factor <= 0 then not decay
         self.learning_rate_decay_factor = 0.5
-        self.num_epochs_per_decay = 2
+        self.num_epochs_per_decay = 3
 
         #Gradient clipping
         self.clip_gradients = 1.0
@@ -66,8 +67,6 @@ class TrainingConfig(object):
         self.max_checkpoints_to_keep = 2
 
         #Set training step
-        self.training_step = 100000
+        self.training_step = 3000000
 
         self.embedding_random = False
-
-
