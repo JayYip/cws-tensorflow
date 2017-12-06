@@ -69,8 +69,9 @@ class LSTMCWS(object):
             with tf.variable_scope('train_eval_input'):
                 #Get all TFRecord path into a list
                 data_files = []
-                file_pattern = '*.TFRecord'
+                file_pattern = os.path.join(self.config.input_file_dir, '*.TFRecord')
                 data_files.extend(tf.gfile.Glob(file_pattern))
+
 
                 data_files = [
                     x for x in data_files

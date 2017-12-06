@@ -18,7 +18,7 @@ import pickle
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.flags.DEFINE_string("input_file_dir", "data\\",
+tf.flags.DEFINE_string("input_file_dir", "data",
                        "Path of TFRecord input files.")
 tf.flags.DEFINE_string("train_dir", "save_model",
                        "Directory for saving and loading model checkpoints.")
@@ -38,6 +38,7 @@ def main(unused_argv):
     model_config = configuration.ModelConfig()
     train_config = configuration.TrainingConfig()
     model_config.train_dir = FLAGS.train_dir
+    model_config.input_file_dir = FLAGS.input_file_dir
 
     #Create train dir
     train_dir = FLAGS.train_dir
