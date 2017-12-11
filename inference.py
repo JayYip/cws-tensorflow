@@ -8,9 +8,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"  
+
 import tensorflow as tf
 import pickle
-import os
 from hanziconv.hanziconv import HanziConv
 
 from ops import input_ops
@@ -20,7 +22,7 @@ from lstm_based_cws_model import LSTMCWS
 
 tf.flags.DEFINE_string("input_file_dir", "data/download_dir/icwb2-data/gold/",
                        "Path of input files.")
-tf.flags.DEFINE_string("vocab_dir", "data/download_dir/vocab.pkl",
+tf.flags.DEFINE_string("vocab_dir", "data/vocab.pkl",
                        "Path of vocabulary file.")
 tf.flags.DEFINE_string("train_dir", "save_model",
                        "Directory for saving and loading model checkpoints.")

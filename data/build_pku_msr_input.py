@@ -388,7 +388,7 @@ def main(unused_argv):
         # Windows may complain if the folders already exist
         pass
 
-    download_extract(FLAGS.data_source, 'N')
+    download_extract(FLAGS.data_source, 'Y')
 
     path_list = get_path(data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data',
                                                'training'))
