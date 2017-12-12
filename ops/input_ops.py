@@ -9,6 +9,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import sys
 
 from hanziconv.hanziconv import HanziConv
 
@@ -108,8 +109,12 @@ def process_line_msr_pku(l):
 
 
 def process_line_as_training(l):
-    decoded_line = HanziConv.toSimplified(
-        l.decode('utf8')).strip().split('\u3000')
+    if sys.version_info >= (3, 0):
+        decoded_line = HanziConv.toSimplified(
+            l.decode('utf8')).strip().split('\u3000')
+    else:
+        decoded_line = HanziConv.toSimplified(
+            l.decode('utf8')).strip().split(u'\u3000')
     return [w.strip('\r\n') for w in decoded_line]
 
 

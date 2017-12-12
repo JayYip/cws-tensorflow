@@ -267,7 +267,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
 
     #Create possible tags for fast lookup
     possible_tags = []
-    for i in range(1, 30):
+    for i in range(1, 300):
         if i == 1:
             possible_tags.append('s')
         else:
@@ -277,7 +277,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
         filename = path_list[s]
         #Create file names for shards
         output_filename = "%s-%s" % (name,
-                                     filename.split('\\')[-1].split('.')[0])
+                                     os.path.split(filename)[-1].split('.')[0])
         output_file = os.path.join(output_filename + '.TFRecord')
 
         #Init writer
@@ -301,7 +301,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
                 decoded_line = process_fn(l)
 
                 for w in decoded_line:
-                    if w and len(w) <= 29:
+                    if w and len(w) <= 299:
                         final_line.append(w)
                         pos_tag.append(possible_tags[len(w) - 1])
 

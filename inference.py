@@ -14,6 +14,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 import tensorflow as tf
 import pickle
 from hanziconv.hanziconv import HanziConv
+import numpy as np
 
 from ops import input_ops
 from ops.vocab import Vocabulary
@@ -117,9 +118,7 @@ def main(unused_argv):
     #Preprocess before building graph
     #Read vocab file
     with open(FLAGS.vocab_dir, 'rb') as f:
-        u = pickle._Unpickler(f)
-        u.encoding = 'latin1'
-        p = u.load()
+        p = pickle.load(f)
 
     if not tf.gfile.IsDirectory(FLAGS.out_dir):
         tf.logging.info('Create Output dir as %s', FLAGS.out_dir)
@@ -168,7 +167,7 @@ def main(unused_argv):
             num_correct = 0
             num_total = 0
             proc_fn = input_ops.get_process_fn(filename)
-            with tf.gfile.GFile(filename, 'rb') as f:
+            with open(filename, 'rb') as f:
                 for line in f:
                     l = proc_fn(line)
                     input_seqs_list = [p.word_to_id(x) for x in ''.join(l)]
@@ -215,10 +214,17 @@ def main(unused_argv):
 
                         if len(predict_tag) != len(input_label):
                             print('predict not right')
+                            print('predict len %d' % len(predict_tag ))
+                            print('label len %d' % len(input_label))
+                            print('text len %d' % len(input_seqs_list))
+                            print(seq_len)
+                            raise ValueError
 
                         output_buffer.append(get_final_output(l, predict_tag))
 
-                        num_correct += seq_acc(input_label, predict_tag)
+                        input_label = np.array(input_label)
+                        num_correct += np.sum(input_label == predict_tag)
+                        #num_correct += seq_acc(input_label, predict_tag)
                         num_total += len(input_label)
 
                     if len(output_buffer) >= 1000:

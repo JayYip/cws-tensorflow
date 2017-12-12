@@ -225,8 +225,7 @@ class LSTMCWS(object):
                 logit, transition_param, self.sequence_length)
 
             with tf.variable_scope('loss'):
-                batch_loss = tf.reduce_mean(-sentence_likelihood) / tf.cast(
-                    tf.reduce_mean(self.sequence_length), dtype=tf.float32)
+                batch_loss = tf.reduce_mean(-sentence_likelihood)
 
                 # if self.is_inf():
                 #     prob = tf.nn.softmax(logit)

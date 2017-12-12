@@ -29,7 +29,7 @@ class ModelConfig(object):
 
         #LSTM input and output dimensions
         self.embedding_size = 64
-        self.num_lstm_units = 64
+        self.num_lstm_units = 128
 
         #Fully connected layer output dimensions
         self.num_tag = 5
