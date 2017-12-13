@@ -77,7 +77,7 @@ def get_final_output(line, predict_tag):
 
 
 def append_to_file(output_buffer, filename):
-    filename = os.path.join(FLAGS.out_dir, 'out_' + os.path.split(filename)[-1])
+    #filename = os.path.join(FLAGS.out_dir, 'out_' + os.path.split(filename)[-1])
 
     if os.path.exists(filename):
         append_write = 'ab'  # append if already exists
@@ -168,6 +168,11 @@ def main(unused_argv):
             num_total = 0
             proc_fn = input_ops.get_process_fn(filename)
             with open(filename, 'rb') as f:
+                # set out name and remove old output
+                out_filename = os.path.join(FLAGS.out_dir, 'out_' + os.path.split(filename)[-1])
+                if os.path.exists(out_filename):
+                    os.remove(out_filename)
+                    
                 for line in f:
                     l = proc_fn(line)
                     input_seqs_list = [p.word_to_id(x) for x in ''.join(l)]
@@ -228,11 +233,11 @@ def main(unused_argv):
                         num_total += len(input_label)
 
                     if len(output_buffer) >= 1000:
-                        append_to_file(output_buffer, filename)
+                        append_to_file(output_buffer, out_filename)
                         output_buffer = []
 
                 if output_buffer:
-                    append_to_file(output_buffer, filename)
+                    append_to_file(output_buffer, out_filename)
 
             print('%s Acc: %f' % (filename, num_correct / num_total))
             print('%s Correct: %d' % (filename, num_correct))
