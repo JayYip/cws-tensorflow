@@ -28,7 +28,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import urllib.request
+import sys
+if sys.version_info >= (3, 0):
+    import urllib.request
+else:
+    from six.moves import urllib
 import zipfile
 import zlib
 import os
@@ -36,10 +40,11 @@ from collections import Counter
 import numpy as np
 import threading
 from datetime import datetime
-import sys
 import pickle
 from hanziconv.hanziconv import HanziConv
 from multiprocessing import Process
+from itertools import chain, islice
+from builtins import open
 
 import tensorflow as tf
 
@@ -50,7 +55,7 @@ tf.flags.DEFINE_string("word_counts_output_file", "word_count",
                        "Word Count output dir")
 tf.flags.DEFINE_integer("train_shards", 128,
                         "Number of shards in training TFRecord files.")
-tf.flags.DEFINE_integer("num_threads", 4,
+tf.flags.DEFINE_integer("num_threads", 8,
                         "Number of threads to preprocess the images.")
 tf.flags.DEFINE_integer("window_size", 5, "The window size of skip-gram model")
 tf.flags.DEFINE_integer("seq_max_len", 30, "Max length of seqence")
@@ -120,8 +125,12 @@ def process_line_msr_pku(l):
 
 
 def process_line_as_training(l):
-    decoded_line = HanziConv.toSimplified(
-        l.decode('utf8')).strip().split('\u3000')
+    if sys.version_info >= (3, 0):
+        decoded_line = HanziConv.toSimplified(
+            l.decode('utf8')).strip().split('\u3000')
+    else:
+        decoded_line = HanziConv.toSimplified(
+            l.decode('utf8')).strip().split(u'\u3000')
     return [w.strip('\r\n') for w in decoded_line]
 
 
@@ -176,8 +185,12 @@ def download_extract(data_source, download='Y'):
 
         if download == 'Y':
             file_name = 'icwb2-data.zip'
-            urllib.request.urlretrieve(
-                'http://sighan.cs.uchicago.edu/bakeoff2005/data/icwb2-data.zip',
+            if sys.version_info >= (3, 0):
+                urllib.request.urlretrieve(
+                    'http://sighan.cs.uchicago.edu/bakeoff2005/data/icwb2-data.zip',
+                    os.path.join(FLAGS.download_dir, file_name))
+            else:
+                urllib.request.urlopen('http://sighan.cs.uchicago.edu/bakeoff2005/data/icwb2-data.zip',
                 os.path.join(FLAGS.download_dir, file_name))
 
             zip_ref = zipfile.ZipFile(
@@ -277,7 +290,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
         filename = path_list[s]
         #Create file names for shards
         output_filename = "%s-%s" % (name,
-                                     os.path.split(filename)[-1].split('.')[0])
+                                     os.path.split(filename)[-1])
         output_file = os.path.join(output_filename + '.TFRecord')
 
         #Init writer
@@ -299,6 +312,7 @@ def _process_text_files(thread_index, name, path_list, vocab, num_shards):
                 final_line = []
 
                 decoded_line = process_fn(l)
+                    
 
                 for w in decoded_line:
                     if w and len(w) <= 299:
@@ -379,6 +393,33 @@ def get_path(data_dir='.', suffix='utf8', mode='train'):
 
     return path_list
 
+def split_files(path_list, num_rows = 50000):
+    tmp_dir = os.path.join(FLAGS.download_dir, 'tmp')
+    if not os.path.exists(tmp_dir):
+        os.mkdir(tmp_dir)
+    return_path_list = []
+
+    def chunks(iterable, n):
+        "chunks(ABCDE,2) => AB CD E"
+        iterable = iter(iterable)
+        while True:
+            # store one line in memory,
+            # chain it to an iterator on the rest of the chunk
+            yield chain([next(iterable)], islice(iterable, n-1))
+
+    for path in path_list:
+        with open(path, encoding = 'utf8') as bigfile:
+            for i, lines in enumerate(chunks(bigfile, num_rows)):
+                file_split = '{}.{}'.format(os.path.split(path)[-1], i)
+                write_file = os.path.join(tmp_dir, file_split)
+                return_path_list.append(write_file)
+                with open(write_file, 'w', encoding = 'utf8') as f:
+                    f.writelines(lines)
+
+    return return_path_list
+
+
+        
 
 def main(unused_argv):
 
@@ -388,18 +429,22 @@ def main(unused_argv):
         # Windows may complain if the folders already exist
         pass
 
-    download_extract(FLAGS.data_source, 'Y')
+    download_extract(FLAGS.data_source, 'N')
 
     path_list = get_path(data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data',
                                                'training'))
 
+    
+
     vocab = _create_vocab(path_list)
     pickle.dump(vocab, open('vocab.pkl', 'wb'))
+
+    path_list = split_files(path_list)
 
     trimmed_path_list = []
     for filename in path_list:
         output_filename = "%s-%s" % ('train',
-                                     filename.split('\\')[-1].split('.')[0])
+                                     os.path.split(filename)[-1])
         output_file = os.path.join(output_filename + '.TFRecord')
         if os.path.isfile(output_file):
             pass
@@ -410,23 +455,6 @@ def main(unused_argv):
 
     _process_dataset('train', path_list, vocab)
 
-    path_list = get_path(
-        data_dir=os.path.join(FLAGS.download_dir, 'icwb2-data', 'gold'),
-        mode='test')
-
-    trimmed_path_list = []
-    for filename in path_list:
-        output_filename = "%s-%s" % ('test',
-                                     filename.split('\\')[-1].split('.')[0])
-        output_file = os.path.join(output_filename + '.TFRecord')
-        if os.path.isfile(output_file):
-            pass
-        else:
-            trimmed_path_list.append(filename)
-
-    path_list = trimmed_path_list
-
-    _process_dataset('test', path_list, vocab)
 
 
 if __name__ == '__main__':
