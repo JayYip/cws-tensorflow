@@ -4,9 +4,9 @@
 
 运行环境:
 
-- Python 3.5
+- Python 3.5 / Python 2.7
 - Tensorflow r1.4
-- Windows
+- Windows / Ubuntu 16.04
 - hanziconv 0.3.2
 - numpy
 
