@@ -1,6 +1,6 @@
 # Tensorflow中文分词模型
 
-注: 如果对准确度比较高的要求, 请使用 https://github.com/JayYip/bert-multiple-gpu
+注: 如果对准确度比较高的要求, 请使用 https://github.com/JayYip/bert-multitask-learning
 
 部分代码参考 [TensorFlow Model Zoo](https://github.com/tensorflow/models)
 
